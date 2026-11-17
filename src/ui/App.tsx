@@ -16,6 +16,8 @@ import { Seg } from './controls';
 import { Help, MyTrees, Shortcuts } from './Dialogs';
 import { Editor } from './Editor';
 import { ExportDialog } from './ExportDialog';
+import { CheckBanner, GradingLog, logOpen } from '../classroom/Checker';
+import { XBAR_ENABLED } from '../classroom/config';
 import { IAuto, IBook, IChevron, IHelp, IDownload, IEdit, IFolder, IFormat, IKeyboard, ILink, IMoon, IMore, IPlus, IRedo, ISliders, ISun, IUndo, IClose } from './icons';
 import { Inspector } from './Inspector';
 import { NanosyntaxPanel } from './NanosyntaxPanel';
@@ -560,12 +562,14 @@ export function App() {
         </div>
         <ExamplesMenu />
         <button class={`btn ghost nanosyntax-toggle ${nanosyntaxEnabled.value ? 'active' : ''}`} title="Show or hide nanosyntax" data-testid="nanosyntax-toggle" aria-pressed={nanosyntaxEnabled.value} onClick={toggleNanosyntax}>Nanosyntax</button>
-        <div class="mode-switch hide-xs" title="Labelling">
-          <Seg value={b.mode} onChange={(v) => applyBuild({ mode: v })} options={[
-            { v: 'manual', label: t('modeManual'), title: t('modeManualHint') },
-            { v: 'xbar', label: t('modeXbar'), title: t('modeXbarHint') },
-          ]} />
-        </div>
+        {XBAR_ENABLED && (
+          <div class="mode-switch hide-xs" title="Labelling">
+            <Seg value={b.mode} onChange={(v) => applyBuild({ mode: v })} options={[
+              { v: 'manual', label: t('modeManual'), title: t('modeManualHint') },
+              { v: 'xbar', label: t('modeXbar'), title: t('modeXbarHint') },
+            ]} />
+          </div>
+        )}
         <div class="mode-switch chain-switch hide-md" title="Movement chains">
           <Seg value={b.chains} onChange={(v) => applyBuild({ chains: v })} options={[
             { v: 'copies', label: 'Copies', title: 'Chains drawn with copies' },
@@ -682,6 +686,8 @@ export function App() {
       {question.value && <OverrideQuestion />}
       <TreeAssignmentDialogs />
       {modal.value === 'export' && <ExportDialog />}
+      <CheckBanner />
+      {logOpen.value && <GradingLog />}
       {modal.value === 'trees' && <MyTrees />}
       {modal.value === 'help' && <Help />}
       {modal.value === 'shortcuts' && <Shortcuts />}

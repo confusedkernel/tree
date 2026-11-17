@@ -6,6 +6,7 @@ import { defaultStyle, FONT_FAMILIES, isLocalFont, presets } from '../core/style
 import type { BuiltinFont, FontId, PresetId, TreeStyle } from '../core/style';
 import { canListLocalFonts, listLocalFamilies, localFamiliesIfAllowed, localFontAvailable, onlySystemFonts, systemFonts } from '../fonts';
 import { t } from '../i18n';
+import { XBAR_ENABLED } from '../classroom/config';
 import { activeTree, appearanceScope, showToast, shownBuild as build, shownStyle as style, trees } from '../state';
 import { applyBuild as setBuild, applyStyle as setStyle } from '../overrides';
 import { overridePolicy } from '../ask';
@@ -32,7 +33,7 @@ function rb(...p: Path): (() => void) | undefined {
 
 export function ModeOptions() {
   const b = build.value;
-  if (b.mode === 'xbar') {
+  if (b.mode === 'xbar' && XBAR_ENABLED) {
     return (
       <>
         <Seg label={t('xbarBar')} small value={b.xbar.bar} reset={rb('xbar', 'bar')} onChange={(v) => setBuild({ xbar: { bar: v } })} options={[
@@ -279,11 +280,15 @@ export function SettingsPanel({hideScope=false}:{hideScope?:boolean}) {
       </Section>
 
       <Section title={t('labelling')}>
-        <Seg value={b.mode} reset={rb('mode')} label="Mode" onChange={(v) => setBuild({ mode: v })} options={[
-          { v: 'manual', label: t('modeManual'), title: t('modeManualHint') },
-          { v: 'xbar', label: t('modeXbar'), title: t('modeXbarHint') },
-        ]} />
-        <ModeOptions />
+        {XBAR_ENABLED && (
+          <>
+            <Seg value={b.mode} reset={rb('mode')} label="Mode" onChange={(v) => setBuild({ mode: v })} options={[
+              { v: 'manual', label: t('modeManual'), title: t('modeManualHint') },
+              { v: 'xbar', label: t('modeXbar'), title: t('modeXbarHint') },
+            ]} />
+            <ModeOptions />
+          </>
+        )}
         <Toggle label={t('showEmpty')} checked={b.showEmpty} reset={rb('showEmpty')} onChange={(v) => setBuild({ showEmpty: v })} />
       </Section>
 

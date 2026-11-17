@@ -14,6 +14,7 @@ import type { Scene } from './core/scene';
 import { defaultStyle, fontCss, restoreStyle } from './core/style';
 import type { TreeStyle } from './core/style';
 import { examples } from './examples';
+import { XBAR_ENABLED } from './classroom/config';
 import type { Example } from './examples';
 import type { LexicalEntry, NSAlgorithm, NSAlgorithmSettings, DerivationStep } from './core/nanosyntax';
 import { derivationDisplaySource, lexicalEntrySource, resolveNSAlgorithm } from './core/nanosyntax';
@@ -172,6 +173,8 @@ export function mergeBuild(base: BuildOptions, p: DeepPartial<BuildOptions> | un
   if (!p) return base;
   const known = Object.fromEntries(Object.entries(p).filter(([k]) => k in base)) as Partial<BuildOptions>;
   if ((known.mode as string) === 'bps') known.mode = 'manual';
+  // classroom edition: X-bar mode can be switched off for the whole site (see classroom/config.ts)
+  if (known.mode === 'xbar' && !XBAR_ENABLED) known.mode = 'manual';
   return {
     ...base,
     ...known,
@@ -1044,6 +1047,9 @@ export function openTree(tr: SavedTree) {
   currentName.value = tr.name;
 }
 
+/** Classroom edition: no autosave while a student's export is open in the checker. */
+export const autosavePaused = signal(false);
+
 /** Initial state: link > autosave > first example. Then autosave on every change. */
 export function initState(): 'link' | 'autosave' | 'example' {
   const fromLink = readHash();
@@ -1070,6 +1076,7 @@ export function initState(): 'link' | 'autosave' | 'example' {
     const name = currentName.value;
     clearTimeout(timer);
     timer = setTimeout(() => {
+      if (autosavePaused.peek()) return;
       lsSet(CURRENT, { snap, name });
       // keep "my trees" entry in sync when editing a saved tree
       if (name) {

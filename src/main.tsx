@@ -6,10 +6,21 @@ import { t } from './i18n';
 import { initState, showToast } from './state';
 import { startLinkSync } from './linksync';
 import { App } from './ui/App';
+import { logOpen, openStamp, readCheckLink } from './classroom/Checker';
 
 installFontFaces();
 document.documentElement.lang = 'en';
+const checkLink = readCheckLink();
 const origin = initState();
+if (checkLink) openStamp(checkLink);
+// #check opens the grading log; a new #v=… link (pasted into the same tab) is checked at once
+const fromHash = () => {
+  const st = readCheckLink();
+  if (st) openStamp(st);
+  else if (/^#check\b/.test(location.hash)) logOpen.value = true;
+};
+if (!checkLink && /^#check\b/.test(location.hash)) logOpen.value = true;
+window.addEventListener('hashchange', fromHash);
 startLinkSync();
 if (origin === 'link') {
   // the link has been read; later edits are autosaved instead

@@ -2442,3 +2442,33 @@ body.resizing .splitter::after {
 .customize-scope .seg {flex-wrap:wrap;}
 .customize-scope {padding:10px;}
 .canvas-tools select {max-width:95px;font-size:11px;}
+
+/* ------------------------------------------------------------ classroom edition */
+.student-id { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
+.student-id input, .check-paste {
+  font: inherit; font-weight: 400; padding: 8px 10px; border: 1px solid var(--border-strong);
+  border-radius: var(--radius); background: var(--surface); color: var(--text);
+}
+.student-id input { font-size: 1.05rem; max-width: 22rem; }
+.student-id input[aria-invalid='true'] { border-color: var(--danger); }
+.check-paste { flex: 1; min-width: 14rem; }
+.check-warn { color: var(--danger); }
+.check-banner {
+  position: fixed; z-index: 40; top: calc(env(safe-area-inset-top, 0px) + 56px); left: 50%; transform: translateX(-50%);
+  width: min(720px, calc(100vw - 24px)); display: flex; gap: 12px; align-items: flex-start;
+  padding: 12px 14px; border-radius: var(--radius); background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-strong); border-left: 6px solid var(--ok); box-shadow: var(--shadow);
+}
+.check-banner.bad { border-left-color: var(--danger); background: linear-gradient(var(--danger-bg), var(--danger-bg)), var(--surface); }
+.check-banner .check-main { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.check-verdict { font-size: 1.05rem; }
+.check-banner.ok .check-verdict { color: var(--ok); }
+.check-banner.bad .check-verdict { color: var(--danger); }
+.check-note { color: var(--muted); font-size: 0.9em; }
+.check-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.check-table-wrap { overflow-x: auto; margin: 10px 0; }
+.check-table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+.check-table th, .check-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.check-table tr.warn td { background: var(--accent-soft); }
+.check-table tr.bad td { background: var(--danger-bg); color: var(--danger); }
+@media (max-width: 640px) { .check-banner { flex-direction: column; } }

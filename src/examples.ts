@@ -2,6 +2,7 @@ import type { BuildOptions } from './core/build';
 import type { TreeStyle } from './core/style';
 import { nanosyntaxExamples } from './core/nanosyntaxExamples';
 import type { NanosyntaxExample } from './core/nanosyntaxExamples';
+import { XBAR_ENABLED } from './classroom/config';
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };
 
@@ -15,7 +16,7 @@ export interface Example {
   nanosyntax?: NanosyntaxExample;
 }
 
-export const examples: Example[] = [
+export const allExamples: Example[] = [
   {
     id: 'xbar',
     title: 'X-bar: auto-projected clause',
@@ -109,3 +110,6 @@ export const examples: Example[] = [
     build: { chains: 'traces', semantics: { show: true, compute: true, types: false, rules: true } },
   },
 ];
+
+/** examples offered in the menu (and on first run); X-bar ones only when X-bar mode is enabled */
+export const examples: Example[] = allExamples.filter((ex) => XBAR_ENABLED || ex.build?.mode !== 'xbar');

@@ -26,6 +26,10 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        env:
+          VITE_CLASS_SECRET: ${{ secrets.CLASS_SECRET }}
+          VITE_CLASS_NAME: ${{ vars.CLASS_NAME }}
+          VITE_CLASS_XBAR: ${{ vars.CLASS_XBAR }}
       - uses: actions/configure-pages@v5
         with:
           enablement: true

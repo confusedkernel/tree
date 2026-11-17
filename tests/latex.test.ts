@@ -9,7 +9,7 @@ import { buildScene } from '../src/core/scene';
 import { approxMeasure } from '../src/core/measure';
 import { defaultStyle } from '../src/core/style';
 import { LATEX_SYMBOLS, parseRich, plain } from '../src/core/richtext';
-import { examples } from '../src/examples';
+import { allExamples, examples } from '../src/examples';
 import { tree } from './helpers';
 import type { BuildOptions } from '../src/core/build';
 
@@ -121,7 +121,7 @@ describe.skipIf(!HAVE_LATEX)('LaTeX output compiles with pdflatex', () => {
     cases.push({ name: ex.id, src: ex.src, build: ex.build as Partial<BuildOptions>, style: ex.style });
   }
   cases.push({ name: 'atb-as-copies', src: examples.find((e) => e.id === 'atb')!.src, build: { chains: 'copies' } });
-  cases.push({ name: 'xbar-bar-style', src: examples[0].src, build: { mode: 'xbar', xbar: { bar: 'always', headLabel: 'X0', emptySpecs: true, barStyle: 'bar', expandWords: true } } });
+  cases.push({ name: 'xbar-bar-style', src: allExamples.find((e) => e.id === 'xbar')!.src, build: { mode: 'xbar', xbar: { bar: 'always', headLabel: 'X0', emptySpecs: true, barStyle: 'bar', expandWords: true } } });
   cases.push({ name: 'atb-traces', src: examples.find((e) => e.id === 'atb')!.src, build: { chains: 'traces', chainIndices: true } });
   cases.push({ name: 'arrow-styles', src: '[CP#c [C′ [C#d did] [TP [DP#y you] [VP [V see] [DP#w what]]]]]\n#w -> #c dashed "wh"\n#y <-> #d curve dotted @blue\n#y -- #w @#2a7', style: { copyStyle: 'strike', leavesAtBottom: true } });
   cases.push({ name: 'round3-decorations', src: '[TP;spread=20 [DP#s;edge=red;width=2 **she** &"focus" &left"✓"@5,-3] [T\' [T;len=15 ~~will~~ *x*] [VP #s"herself" [V sing]]]]\n#s/2 -> #s/1 @blue above"*A*-mvt" below"x"' });

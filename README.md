@@ -1,6 +1,8 @@
+> **About this fork.** This is a personalized fork of [NanoTrees](https://github.com/interprole/tree) for my Intro to Linguistics course. Students use it to draw syntax trees for assignments and export stamped PNGs to hand in. It differs from the original: exports are signed and carry a student ID, SVG/PDF/LaTeX export is removed, and X-bar mode is off by default. See **[CLASSROOM.md](CLASSROOM.md)** for what changed, how instructors check exports, and how to set up your own copy. Everything below is the original NanoTrees documentation.
+
 # NanoTrees
 
-**[Open NanoTrees](https://interprole.github.io/tree/)** · by Gleb Bubnov
+**[Open NanoTrees](https://confusedkernel.github.io/tree/)** · by Gleb Bubnov
 
 An interactive syntax-tree editor for linguists. Type bracket notation or edit the picture; canvas edits update the same code and undo history. The editor, including nanosyntactic derivation search, runs in the browser. Static hosting on GitHub Pages is sufficient. An optional separate HTTP service provides the same analysis, exports and spellout to external programs.
 

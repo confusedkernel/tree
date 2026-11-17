@@ -1,0 +1,45 @@
+# NanoTrees, classroom edition
+
+A fork of [NanoTrees](https://github.com/interprole/tree) (MIT) for assignments where students draw syntax trees and hand in printouts.
+
+## What changed
+
+**Export (students).** The export dialog asks for a student ID and offers only a stamped PNG (download or copy). SVG, PDF and LaTeX export are removed, since they would give an unstamped picture. Each PNG has
+
+- the student ID repeated faintly behind the tree, so cropping off the footer does not remove it;
+- a footer with the ID, the export time, a tree fingerprint and a check code;
+- a QR code holding the tree as exported, the student ID, the time and a signature (HMAC-SHA256) over all of them.
+
+**X-bar mode (off by default).** X-bar mode fills in XP → X′ → X projections by itself, which gives the answer away on X-bar assignments, so this edition builds without it: the Labelling switch and the X-bar example are hidden, and saved files or shared links that ask for X-bar mode open in manual mode. To turn it back on, build with `VITE_CLASS_XBAR=on` (on GitHub, the repository variable `CLASS_XBAR`). The checker notes any export that was made in X-bar mode.
+
+**Checking (instructor).** Scan a printed QR code with a phone camera: it opens this page with the student's tree loaded and a banner that says whether the signature is valid, whose export it is, and which other checked students handed in the same tree. Changing the ID, the time or the tree in the QR code makes the signature fail.
+
+Open `…/#check` (bookmark it) for the grading log. There you can also add photos or scans of printouts (several at once), paste a link from a QR code, and download the log as CSV. The log is kept in the browser of the device you check on.
+
+The tree fingerprint depends only on the tree's structure and labels, not on the student or on how the code was typed. Identical fingerprints from different students are a lead, not proof: correct answers to an easy item will often be identical. Shared wrong trees are the stronger sign.
+
+## Limits
+
+- The signing secret is inside the page's JavaScript. The scheme stops a student who edits the ID in an image editor, pastes in someone else's footer, or prints a friend's file. It does not stop a student who digs the secret out of the source.
+- A student can always retype a classmate's tree under their own ID. The stamp tells you who exported a tree, not who thought of it. Varying the sentence per student is what closes that gap.
+
+## Setup
+
+1. Fork this repository on GitHub.
+2. Settings → Secrets and variables → Actions: add a repository **secret** `CLASS_SECRET` (any long random string), and optionally a **variable** `CLASS_NAME` (shown in the PNG footer, e.g. "Intro to Syntax, Fall 2026"). Set a variable `CLASS_XBAR` to `on` only if students may use X-bar mode.
+3. Settings → Pages → Source: **GitHub Actions**.
+4. Push to `main` (or run the workflow by hand). The site appears at `https://<user>.github.io/<repo>/`.
+
+Keep `CLASS_SECRET` unchanged for the whole term: exports signed under an old secret show as not valid.
+
+The QR code links back to the address the student exported from, so students must use the hosted site. Exports made from a downloaded copy opened as a file carry a plain-text code instead; the grading log still reads it from a photo or a paste.
+
+## Local build
+
+```sh
+npm ci
+VITE_CLASS_SECRET='…' npm run dev                       # development
+VITE_CLASS_SECRET='…' npx vite build --mode offline     # one self-contained nanotrees.html
+```
+
+Code for this edition: `src/classroom/` (signing, stamping, checker, grading log), `src/ui/ExportDialog.tsx`, and small hooks in `src/main.tsx`, `src/state.ts`, `src/ui/App.tsx`.
