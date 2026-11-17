@@ -954,3 +954,16 @@ test.describe('Safari', () => {
     }
   });
 });
+
+test('New menu starts from scratch or from an example', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.locator('[data-node]').first()).toBeVisible();
+  await expect(page.getByTestId('examples-button')).toContainText('New');
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByTestId('examples-button').click();
+  await page.getByTestId('new-scratch').click();
+  await expect(page.locator('[data-node]')).toHaveCount(0);
+  await page.getByTestId('examples-button').click();
+  await page.locator('[data-example="wh"]').click();
+  await expect(page.locator('[data-node]').first()).toBeVisible();
+});

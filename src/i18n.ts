@@ -1,6 +1,11 @@
 const en = {
   appTagline: 'syntax trees for linguists',
-  examples: 'Examples',
+  new: 'New',
+  newScratch: 'Start from scratch',
+  newScratchHint: 'An empty canvas with one blank tree.',
+  newScratchConfirm: 'Start from scratch? All trees of the canvas go (save them to disk or in My trees first if you need them).',
+  newSyntaxExamples: 'Start from an example',
+  newNanosyntaxExamples: 'Nanosyntax examples',
   mode: 'Labelling',
   modeManual: 'Manual',
   modeXbar: 'X-bar',

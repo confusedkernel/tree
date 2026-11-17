@@ -30,7 +30,7 @@ export const allExamples: Example[] = [
   },
   {
     id: 'wh',
-    title: 'Wh-movement (chain) and T-to-C (head movement)',
+    title: 'Wh-movement and T-to-C',
     note: '[DP#wh …] and #wh are two positions of one constituent: switch between copies, traces and multidominance. T-to-C is head movement (;to=c on T): C shows T+C.',
     src: `% #wh marks the positions of a moved phrase; ;to=c on T is head movement to C
 [CP [DP#wh what]
@@ -51,7 +51,7 @@ export const allExamples: Example[] = [
   },
   {
     id: 'copy-words',
-    title: 'Copies pronounced differently: Wambeek Dutch pronoun copy',
+    title: 'Wambeek Dutch pronoun copies',
     note: 'A lower copy is spelled out with other words: #subj"zij | she" shows the pronoun (with a gloss) in the position of the copy.',
     build: { chainIndices: true },
     src: `% Wambeek Dutch pronoun copy (van Craenenbroeck & van Koppen 2002: 56)

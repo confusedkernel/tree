@@ -19,12 +19,12 @@ import { ExportDialog } from './ExportDialog';
 import { CheckBanner, GradingLog, logOpen } from '../classroom/Checker';
 import { SHARING_ENABLED, XBAR_ENABLED } from '../classroom/config';
 import { appClipboard } from '../classroom/clipboard';
-import { IAuto, IBook, IChevron, IHelp, IDownload, IEdit, IFolder, IFormat, IKeyboard, ILink, IMoon, IMore, INano, IPlus, IRedo, ISliders, ISun, IUndo, IClose } from './icons';
+import { IAuto, IChevron, IHelp, IDownload, IEdit, IFolder, IFormat, IKeyboard, ILink, IMoon, IMore, INano, IPlus, IRedo, ISliders, ISun, IUndo, IClose } from './icons';
 import { Inspector } from './Inspector';
 import { NanosyntaxPanel } from './NanosyntaxPanel';
 import { loadCanvasExample } from '../nanosyntax';
 import { TreeAssignmentDialogs } from './TreeAssignmentDialogs';
-import { codeSelection, focusTreeRequest, nanosyntaxEnabled, rightPanelOpen, toggleNanosyntax, treeTargetPick, visibleTrees } from '../state';
+import { clearCanvas, codeSelection, fitRequest, focusTreeRequest, nanosyntaxEnabled, rightPanelOpen, sources, toggleNanosyntax, treeTargetPick, visibleTrees } from '../state';
 import { autoSaveFile, canWriteFiles, fileHandle, fileName, loadFile, openFromDisk, saveToDisk, unsaved } from '../files';
 import { CustomizePanel } from './CustomizePanel';
 
@@ -244,29 +244,46 @@ function useShortcuts() {
   }, []);
 }
 
-function ExamplesMenu() {
+/** New: an empty canvas, or one of the examples (grouped by kind). */
+function NewMenu() {
   const open = useSignal(false);
   useDismiss('.examples', () => open.value, () => (open.value = false));
+  const run = (f: () => void) => () => {
+    open.value = false;
+    f();
+  };
+  const groups = [
+    { label: t('newSyntaxExamples'), items: examples.filter((ex) => !ex.nanosyntax) },
+    { label: t('newNanosyntaxExamples'), items: examples.filter((ex) => ex.nanosyntax) },
+  ].filter((group) => group.items.length);
   return (
     <div class="examples menu">
-      <button class="btn ghost" aria-haspopup="true" aria-expanded={open.value} onClick={() => (open.value = !open.value)} data-testid="examples-button">
-        <IBook size={17} /> <span class="hide-sm">{t('examples')}</span> <IChevron size={14} class="chev" />
+      <button class="btn" aria-haspopup="true" aria-expanded={open.value} onClick={() => (open.value = !open.value)} data-testid="examples-button">
+        <IPlus size={17} /> <span class="hide-sm">{t('new')}</span> <IChevron size={14} class="chev" />
       </button>
       {open.value && (
-        <div class="menu-pop" role="menu">
-          {examples.map((ex) => (
-            <button
-              key={ex.id}
-              role="menuitem"
-              data-example={ex.id}
-              onClick={() => {
-                void loadCanvasExample(ex);
-                open.value = false;
-              }}
-            >
-              <strong>{ex.title}</strong>
-              <small>{ex.note}</small>
-            </button>
+        <div class="menu-pop new-pop" role="menu">
+          <button
+            role="menuitem"
+            data-testid="new-scratch"
+            onClick={run(() => {
+              if (Object.values(sources.value).some((code) => code.trim()) && !confirm(t('newScratchConfirm'))) return;
+              clearCanvas();
+              fitRequest.value++;
+            })}
+          >
+            <strong>{t('newScratch')}</strong>
+            <small>{t('newScratchHint')}</small>
+          </button>
+          {groups.map((group) => (
+            <div key={group.label} class="menu-group" role="group" aria-label={group.label}>
+              <div class="menu-head">{group.label}</div>
+              {group.items.map((ex) => (
+                <button key={ex.id} role="menuitem" class="compact" title={ex.note} data-example={ex.id} onClick={run(() => void loadCanvasExample(ex))}>
+                  {ex.title}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -337,7 +354,7 @@ function FileMenu() {
   const name = fileName.value;
   return (
     <div class="file-menu menu">
-      <button class="btn ghost" aria-haspopup="true" aria-expanded={open.value} onClick={() => (open.value = !open.value)} title={name ? `File: ${name}${SHARING_ENABLED && unsaved.value ? ' (unsaved changes)' : ''}` : SHARING_ENABLED ? 'Save to disk, open, my trees' : 'My trees'} data-testid="file-menu">
+      <button class="btn" aria-haspopup="true" aria-expanded={open.value} onClick={() => (open.value = !open.value)} title={name ? `File: ${name}${SHARING_ENABLED && unsaved.value ? ' (unsaved changes)' : ''}` : SHARING_ENABLED ? 'Save to disk, open, my trees' : 'My trees'} data-testid="file-menu">
         <IFolder size={17} /> <span class="hide-md file-label">{name ?? 'File'}</span>
         {SHARING_ENABLED && unsaved.value && <span class="unsaved-dot" title="Unsaved changes" />}
         <IChevron size={14} class="chev" />
@@ -554,7 +571,6 @@ export function App() {
             <span class="tagline hide-md">{t('appTagline')} · by Gleb Bubnov</span>
           </div>
         </div>
-        <ExamplesMenu />
         <button class={`btn ghost nanosyntax-toggle ${nanosyntaxEnabled.value ? 'active' : ''}`} title="Show or hide nanosyntax" data-testid="nanosyntax-toggle" aria-pressed={nanosyntaxEnabled.value} aria-label="Nanosyntax" onClick={toggleNanosyntax}>
           <INano size={17} /> <span class="hide-xs">Nanosyntax</span>
         </button>
@@ -582,6 +598,7 @@ export function App() {
             <IRedo />
           </button>
           <span class="sep hide-xs" />
+          <NewMenu />
           <FileMenu />
           {SHARING_ENABLED && (
             <button class="btn ghost" onClick={share} title={t('share')} data-testid="share">
