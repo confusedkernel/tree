@@ -5,7 +5,8 @@ async function setup(page:Page,code='[S [A a] [B b] [C c]]') {
   const paper=page.locator('.active-sheet .paper'), b=(await paper.boundingBox())!;
   await paper.click({position:{x:b.width/2,y:b.height-5}});
   const editor=page.locator('.cm-content');await editor.click();await page.keyboard.press('ControlOrMeta+a');await page.keyboard.insertText(code);
-  await page.locator('.mode-switch button',{hasText:'Manual'}).click();
+  // the labelling switch is only shown when X-bar mode is enabled; otherwise manual is the only mode
+  const manual=page.locator('.mode-switch button',{hasText:'Manual'});if(await manual.count())await manual.click();
   await page.getByRole('button',{name:'Fit to window',exact:true}).click();
 }
 const node=(page:Page,label:string)=>page.locator('.active-sheet [data-node]').filter({has:page.locator('title',{hasText:new RegExp('^'+label+'$')})}).first();

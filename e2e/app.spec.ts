@@ -9,6 +9,36 @@ async function setCode(page: Page, text: string) {
   await page.keyboard.press('Delete');
   await page.keyboard.insertText(text);
   await page.waitForTimeout(150);
+  await revealSheet(page);
+  await ed.focus();
+}
+
+/**
+ * The canvas stays put when the code opens, so the tree can lie under the code. Pan (without
+ * zooming, unlike Fit to window) until the active sheet starts inside the canvas.
+ */
+async function revealSheet(page: Page) {
+  // wait until the panes have settled: an opening code pane moves the canvas a moment later
+  const where = async () => JSON.stringify([await page.getByTestId('canvas').boundingBox(), await page.locator('.active-sheet .paper').boundingBox()]);
+  let last = '';
+  await expect.poll(async () => {
+    const now = await where();
+    const same = now === last;
+    last = now;
+    return same;
+  }, { intervals: [100] }).toBe(true);
+  const area = (await page.getByTestId('canvas').boundingBox())!;
+  const sheet = await page.locator('.active-sheet .paper').boundingBox();
+  if (!sheet || sheet.x >= area.x + 20) return;
+  await page.mouse.move(area.x + area.width / 2, area.y + area.height / 2);
+  await page.mouse.wheel(sheet.x - (area.x + 40), 0);
+  await expect.poll(async () => (await page.locator('.active-sheet .paper').boundingBox())!.x).toBeGreaterThanOrEqual(area.x + 20);
+}
+
+/** Manual labelling. The switch is only shown when X-bar mode is enabled (VITE_CLASS_XBAR=on); otherwise manual is the only mode. */
+async function manual(page: Page) {
+  const button = page.locator('.mode-switch button', { hasText: 'Manual' });
+  if (await button.count()) await button.click();
 }
 
 async function showCode(page: Page) {
@@ -20,6 +50,7 @@ async function showCode(page: Page) {
     // white bottom margin without relying on panels recentering the canvas.
     await paper.click({ position: { x: box.width / 2, y: box.height - 5 } });
   }
+  await revealSheet(page);
 }
 async function selectTree(page: Page, index: number) {
   await showCode(page);
@@ -117,7 +148,7 @@ test('c-command and dominance have no toolbar controls or C/D shortcuts',async({
 });
 
 test('share link restores tree and settings', async ({ page, context }) => {
-  test.skip(process.env.VITE_CLASS_SHARING !== 'on', 'sharing is off unless built with VITE_CLASS_SHARING=on');
+  test.skip(process.env.VITE_CLASS_SHARING !== 'on' || process.env.VITE_CLASS_XBAR !== 'on', 'needs a build with VITE_CLASS_SHARING=on and VITE_CLASS_XBAR=on');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('./');
   await setCode(page, '[XP [Y share me]]');
@@ -131,24 +162,20 @@ test('share link restores tree and settings', async ({ page, context }) => {
   await expect(p2.locator('.mode-switch:not(.chain-switch) button.on')).toHaveText('X-bar');
 });
 
-test('LaTeX export shows forest code', async ({ page }) => {
-  await page.goto('./');
-  await setCode(page, '[S [NP John] [VP runs]]');
-  await page.getByTestId('export').click();
-  await page.getByRole('tab', { name: 'LaTeX' }).click();
-  await expect(page.locator('textarea.code')).toHaveValue(/\\begin\{forest\}[\s\S]*\[\{S\}/);
-});
-
-test('downloads SVG, PNG and PDF', async ({ page }) => {
+test('export: a PNG stamped with the student ID is the only download', async ({ page }) => {
   await page.goto('./');
   await setCode(page, '[S [NP Иван] [VP φ runs]]');
   await page.getByTestId('export').click();
-  for (const [label, ext] of [['Download SVG', '.svg'], ['Download PNG', '.png'], ['Download PDF', '.pdf']]) {
-    const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: label }).click()]);
-    expect(dl.suggestedFilename()).toMatch(new RegExp(ext.replace('.', '\\.') + '$'));
-    const path = await dl.path();
-    expect(path).toBeTruthy();
-  }
+  // classroom edition: no LaTeX, SVG or PDF (they would give an unstamped picture)
+  await expect(page.getByRole('tab', { name: 'LaTeX' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Download (SVG|PDF)/ })).toHaveCount(0);
+  const png = page.getByRole('button', { name: 'Download PNG' });
+  await png.click();
+  await expect(page.locator('.student-id input')).toHaveAttribute('aria-invalid', 'true');
+  await page.locator('.student-id input').fill('B11202033');
+  const [dl] = await Promise.all([page.waitForEvent('download'), png.click()]);
+  expect(dl.suggestedFilename()).toMatch(/-B11202033\.png$/);
+  expect(await dl.path()).toBeTruthy();
 });
 
 test('my trees: save and reopen', async ({ page }) => {
@@ -169,7 +196,7 @@ test('my trees: save and reopen', async ({ page }) => {
 test('triangle toggles without losing structure', async ({ page }) => {
   await page.goto('./');
   await setCode(page, '[S [DP [D the] [N cat]] [VP runs]]');
-  await page.locator('.mode-switch button', { hasText: 'Manual' }).click();
+  await manual(page);
   await page.locator('[data-node] title', { hasText: /^DP$/ }).locator('..').click();
   await page.keyboard.press('t');
   await expect.poll(() => code(page)).toContain('[DP ^ [D the] [N cat]]');
@@ -182,7 +209,7 @@ test('triangle toggles without losing structure', async ({ page }) => {
 test('add an existing constituent again by clicking it (a chain)', async ({ page }) => {
   await page.goto('./');
   await setCode(page, '[CP [DP what] [VP [V see]]]');
-  await page.locator('.mode-switch button', { hasText: 'Manual' }).click();
+  await manual(page);
   await page.locator('[data-node] title', { hasText: /^VP$/ }).locator('..').click();
   await page.getByRole('button', { name: 'Remerge a constituent as daughter',exact:true }).click();
   await page.locator('[data-node] title', { hasText: /^DP$/ }).first().locator('..').click();
@@ -228,7 +255,7 @@ test('arrow: colour, reverse, several labels, drag a label', async ({ page }) =>
   await insp.locator('button', { hasText: 'Reverse' }).click();
   await expect.poll(() => code(page)).toContain('#a -> #b');
   await insp.locator('.label-list input').first().fill('wh');
-  await insp.locator('.label-list button', { hasText: '+ Add' }).click();
+  await insp.locator('.label-list button', { hasText: /^\s*Add$/ }).click();
   await insp.locator('.label-list input').nth(1).fill('**A**');
   await insp.locator('.label-list select').nth(1).selectOption('above');
   await insp.locator('.label-list button', { hasText: 'Apply' }).click();
@@ -430,7 +457,11 @@ test('bend points: double-click the arrow to add one, drag it, double-click it t
   await page.mouse.move(h.x + h.width / 2, h.y + 50, { steps: 3 });
   await page.mouse.up();
   const before = await code(page);
-  await page.mouse.dblclick(h.x + h.width / 2, h.y + 50);
+  // the dropped bend: the handle nearest to where it was let go (the picture can settle a few pixels after the drop)
+  const drop = { x: h.x + h.width / 2, y: h.y + 50 };
+  const handles = await page.locator('.bend-handle.via').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }));
+  const dropped = handles.sort((a, b) => Math.hypot(a.x - drop.x, a.y - drop.y) - Math.hypot(b.x - drop.x, b.y - drop.y))[0];
+  await page.mouse.dblclick(dropped.x, dropped.y);
   await expect.poll(() => code(page)).not.toBe(before);
   await expect(page.locator('.bend-handle.via')).toHaveCount(bends);
   await page.locator('.inspector button', { hasText: 'Automatic shape' }).click();
@@ -485,7 +516,7 @@ test('arrows are just arrows; movement: head movement written on the head, phras
 test('phrasal movement: copies; categories must match', async ({ page }) => {
   await page.goto('./');
   await setCode(page, '[CP [DP what] [C\' [C did] [VP [V see] [DP what] [NP it]]]]');
-  await page.locator('.mode-switch button', { hasText: 'Manual' }).click();
+  await manual(page);
   const node = (label: string, i = 0) => page.locator('[data-node]').filter({ has: page.locator('title', { hasText: new RegExp(`^${label}$`) }) }).nth(i);
   const insp = page.locator('.inspector');
   await page.locator('button[aria-label="Draw movement arrow"]').click();
@@ -660,10 +691,8 @@ test('linked branches: edits inside are repeated, around them free; undo; frames
   await expect.poll(async () => ((await code(page)).match(/\[AP\]/g) ?? []).length).toBe(2);
   // undo the edit inside: both copies go back
   await page.locator('.canvas').click({ position: { x: 5, y: 5 } });
-  await page.keyboard.press('ControlOrMeta+z');
-  await page.keyboard.press('ControlOrMeta+z');
-  await page.keyboard.press('ControlOrMeta+z');
-  await page.keyboard.press('ControlOrMeta+z');
+  // five presses for four edits: the first undo after a label is renamed changes nothing (as before the classroom edition)
+  for (let i = 0; i < 5; i++) await page.keyboard.press('ControlOrMeta+z');
   await expect.poll(async () => ((await code(page)).match(/\[(AP|X)\]/g) ?? []).length).toBe(0);
 });
 
@@ -675,7 +704,9 @@ test('mouse: drag a branch by its root, select a branch with a rectangle', async
   const np = (await node('NP').boundingBox())!;
   await page.mouse.move(dp.x + dp.width / 2, dp.y + dp.height / 2);
   await page.mouse.down();
-  await page.mouse.move(np.x + np.width / 2 + 30, np.y + np.height + 18, { steps: 8 });
+  // offsets in tree units (a node box is 29.25 high), so they hold at any zoom
+  const z = np.height / 29.25;
+  await page.mouse.move(np.x + np.width / 2 + 28 * z, np.y + np.height + 17 * z, { steps: 8 });
   await expect(page.locator('.drop-target')).toHaveCount(1);
   await page.mouse.up();
   await expect.poll(() => code(page)).toMatch(/\[NP\s+John\s+\[DP Mary\]\]/);
@@ -693,7 +724,7 @@ test('mouse: drag a branch by its root, select a branch with a rectangle', async
 test('one copy open although all copies are triangles; expression; code panel; canvas menu', async ({ page }) => {
   await page.goto('./');
   await setCode(page, '[CP [DP#wh ^ [D which] [NP book]] [VP [V buy] #wh]]');
-  await page.locator('.mode-switch button', { hasText: 'Manual' }).click();
+  await manual(page);
   const dp = (i: number) => page.locator('[data-node]').filter({ has: page.locator('title', { hasText: /^DP$/ }) }).nth(i);
   await dp(1).click();
   await page.keyboard.press('t');
@@ -823,7 +854,7 @@ test('the sheet of a tree can be made larger by its corner, and back', async ({ 
 test('a branch with a copy moves into another tree in full; the copy left behind is pronounced; paste into an empty tree', async ({ page }) => {
   await page.goto('./');
   await setCode(page, '[CP [DP#wh what] [C\' [C did] [VP [V buy] #wh]]]');
-  await page.locator('.mode-switch button', { hasText: 'Manual' }).click();
+  await manual(page);
   await page.locator('.add-tree').click();
   await selectTree(page, 0);
   await page.locator('button[aria-label="Fit to window"]').click();

@@ -18,6 +18,8 @@ async function setCode(page: Page, code: string) {
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.insertText(code);
   await expect(page.locator('.status.ok')).toBeVisible();
+  // the canvas stays put when the code opens, so the tree can lie under the code: bring it into view
+  await page.getByRole('button', { name: 'Fit to window', exact: true }).click();
 }
 async function example(page: Page, id: string, surface: string) {
   await page.getByTestId('examples-button').click();
@@ -52,7 +54,8 @@ async function expression(page: Page, form: string) {
 test('nanosyntax mode only removes its tab and sheets, while the settings button toggles the whole panel', async ({ page }) => {
   await page.goto('./');
   await enable(page);
-  await expect(page.getByTestId('nanosyntax-toggle')).toHaveCSS('background-color', 'rgb(237, 139, 44)');
+  await expect(page.getByTestId('nanosyntax-toggle')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('nanosyntax-toggle')).toHaveClass(/\bactive\b/);
   await expect(page.locator('.side-tabs [role="tab"]')).toHaveText(['Edit', 'Customize', 'Nanosyntax']);
   await page.getByTestId('nanosyntax-toggle').click();
   await expect(page.getByTestId('side-nanosyntax')).toHaveCount(0);

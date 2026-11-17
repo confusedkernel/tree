@@ -94,6 +94,8 @@ test('selected panel text keeps native copy and cut even when a tree node is sel
   await editor.click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.insertText('[DP [D the] [NP cat]]');
+  // the canvas stays put when the code opens, so the tree can lie under the code: bring it into view
+  await page.getByRole('button', { name: 'Fit to window', exact: true }).click();
   await page.locator('[data-node] title', { hasText: /^DP$/ }).locator('..').click();
   const code = await editor.innerText();
   const outcome = await page.evaluate(() => {
@@ -122,5 +124,7 @@ test('selected panel text keeps native copy and cut even when a tree node is sel
     return { prevented: event.defaultPrevented, data: clipboardData.getData('text/plain') };
   });
   expect(canvasCopy.prevented).toBe(true);
-  expect(canvasCopy.data).toContain('[DP');
+  // classroom edition: with sharing off the branch goes to the app's own clipboard, not the system one
+  if (process.env.VITE_CLASS_SHARING === 'on') expect(canvasCopy.data).toContain('[DP');
+  else expect(canvasCopy.data).toBe('');
 });
