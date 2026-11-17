@@ -46,4 +46,5 @@ export const IScales = make(<><path d="M12 3v18M7 21h10M5 7h14" /><path d="m5 7-
 export const ICopyNode = make(<><circle cx="7" cy="6" r="3" /><circle cx="17" cy="18" r="3" stroke-dasharray="2 2" /><path d="M9 8.5 15 15.5" stroke-dasharray="2 2" /></>);
 export const IMore = make(<><circle cx="5" cy="12" r="1.4" fill="currentColor" /><circle cx="12" cy="12" r="1.4" fill="currentColor" /><circle cx="19" cy="12" r="1.4" fill="currentColor" /></>);
 export const IMother = make(<><rect x="8" y="3" width="8" height="5" rx="1" stroke-dasharray="2 2" /><path d="M12 8v5" /><rect x="8" y="13" width="8" height="5" rx="1" /><path d="M19 4.5h4M21 2.5v4" /></>);
+export const INano = make(<><path d="M12 4v5M12 9l-6 10M12 9l6 10M9 14l3 5" /></>);
 export const IFormat = make(<path d="M4 6h10M8 10h12M8 14h9M4 18h10" />);

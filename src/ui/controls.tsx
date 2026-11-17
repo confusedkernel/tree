@@ -1,4 +1,31 @@
 import type { ComponentChildren } from 'preact';
+import { useEffect, useRef } from 'preact/hooks';
+import { IClose } from './icons';
+
+/**
+ * Closes a popup on Escape and, when `within` (a CSS selector) is given, on a press outside it.
+ * Escape is taken before the app's own shortcuts, so closing a menu does not also drop the selection.
+ */
+export function useDismiss(within: string | null, isOpen: () => boolean, close: () => void) {
+  const latest = useRef({ isOpen, close });
+  latest.current = { isOpen, close };
+  useEffect(() => {
+    const away = (e: PointerEvent) => {
+      if (within && latest.current.isOpen() && !(e.target as Element).closest(within)) latest.current.close();
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !latest.current.isOpen()) return;
+      e.stopPropagation();
+      latest.current.close();
+    };
+    window.addEventListener('pointerdown', away);
+    window.addEventListener('keydown', esc, true);
+    return () => {
+      window.removeEventListener('pointerdown', away);
+      window.removeEventListener('keydown', esc, true);
+    };
+  }, []);
+}
 
 export function Section({ title, children }: { title: string; children: ComponentChildren }) {
   return (
@@ -99,13 +126,14 @@ export function Select<T extends string>({ label, value, options, onChange, rese
 }
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ComponentChildren; wide?: boolean }) {
+  useDismiss(null, () => true, onClose);
   return (
     <div class="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div class={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <header>
           <h2>{title}</h2>
-          <button class="icon-btn" onClick={onClose} aria-label="Close">
-            ✕
+          <button class="icon-btn" onClick={onClose} title="Close (Esc)" aria-label="Close">
+            <IClose size={16} />
           </button>
         </header>
         <div class="modal-body">{children}</div>

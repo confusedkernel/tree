@@ -89,6 +89,7 @@ export function ExportDialog() {
           <div class="card">
             <h4>PNG</h4>
             <Seg label={t('scale')} small value={String(scale.value)} onChange={(v) => (scale.value = Number(v))} options={[2, 3, 4].map((x) => ({ v: String(x), label: `${x}× · ${Math.round(x * 96)} dpi` }))} />
+            <div class="row wrap">
             <button class="btn primary" disabled={busy.value || (touched.value && !idOk)} onClick={() => run(async () => download(await stamped(), `${base}-${safeId}.png`))}>
               <IDownload size={16} /> {t('downloadPng')}
             </button>
@@ -108,6 +109,7 @@ export function ExportDialog() {
             >
               <ICopy size={16} /> {t('copyImage')}
             </button>
+            </div>
           </div>
           {SHARING_ENABLED && (
             <div class="row wrap">

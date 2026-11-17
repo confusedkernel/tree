@@ -3,6 +3,7 @@ import jsQR from 'jsqr';
 import { download } from '../export';
 import { autosavePaused, restore } from '../state';
 import { Modal } from '../ui/controls';
+import { IClose } from '../ui/icons';
 import { USING_DEFAULT_SECRET, XBAR_ENABLED } from './config';
 import type { CheckResult } from './grading';
 import { check, clearLog, gradingLog, logCsv, sharedTrees } from './grading';
@@ -72,8 +73,8 @@ export function CheckBanner() {
         <button class="btn" onClick={() => (logOpen.value = true)}>
           Grading log ({gradingLog.value.length})
         </button>
-        <button class="btn ghost" onClick={() => (checking.value = null)} aria-label="Close">
-          ✕
+        <button class="icon-btn" onClick={() => (checking.value = null)} title="Close" aria-label="Close">
+          <IClose size={16} />
         </button>
       </div>
     </div>

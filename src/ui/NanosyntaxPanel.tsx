@@ -21,6 +21,7 @@ export function NanosyntaxPanel() {
   const own = !!owner.nanosyntax?.algorithm || !!Object.keys(owner.nanosyntax?.rules ?? {}).length;
   return <div class="nanosyntax-panel" data-testid="nanosyntax-panel">
     <div class="scope ns-settings-scope">
+      <span class="end-lbl">Apply to</span>
       <div class="seg small" role="group" aria-label="Nanosyntax settings scope">
         <button class={scope.value === 'tree' ? 'on' : ''} onClick={() => scope.value = 'tree'}>This tree</button>
         <button class={scope.value === 'canvas' ? 'on' : ''} onClick={() => scope.value = 'canvas'}>Whole canvas</button>

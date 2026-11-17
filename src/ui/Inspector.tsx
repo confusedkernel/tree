@@ -9,7 +9,7 @@ import { hasOnlyExponent } from '../core/arrows';
 import { plain } from '../core/richtext';
 import { t } from '../i18n';
 import { editable, focusLabel, linkCounts, selection, showToast, tree } from '../state';
-import { IArrowTool, IChild, ICopyNode, IMother, ISister, ITrash, ITriangle } from './icons';
+import { IArrowTool, IChild, IClose, ICopyNode, IMother, IPlus, ISister, ITrash, ITriangle } from './icons';
 
 const PALETTE = ['#b91c1c', '#c2410c', '#a16207', '#15803d', '#0f766e', '#1d4ed8', '#6d28d9', '#be185d', '#57534e'];
 
@@ -225,13 +225,13 @@ function LabelList({ initial, onApply, placeholder }: { initial: E.LabelSpec[]; 
             ))}
           </select>
           <button type="button" class="icon-btn small" title="Remove" aria-label="Remove" onClick={() => (items.value = items.value.filter((_, k) => k !== i))}>
-            ✕
+            <IClose size={13} />
           </button>
         </div>
       ))}
       <div class="row">
         <button type="button" class="btn small" onClick={() => (items.value = [...items.value, { text: '', side: 'auto' }])}>
-          + Add
+          <IPlus size={13} /> Add
         </button>
         <button class="btn small primary" type="submit">
           Apply
@@ -331,9 +331,7 @@ function NodePanel({ n }: { n: DNode }) {
       <ToolRow>
         <Tool title={t('addChild')} icon={<IChild />} text="New daughter" disabled={disabled} onClick={() => A.addChild(n)} />
         <Tool title={t('addSister')} icon={<ISister />} text="New sister" disabled={disabled || !n.parents.length} onClick={() => A.addSister(n)} />
-        <Tool title="Remerge a constituent as daughter" icon={<ICopyNode />} text="Remerged daughter" disabled={disabled} onClick={()=>A.startPick('daughter',n)}/>
-        <Tool title="Remerge a constituent as sister" icon={<ICopyNode />} text="Remerged sister" disabled={disabled||!n.parents.length} onClick={()=>A.startPick('sister',n)}/>
-        <Tool title="Add a mother above (P)" icon={<IMother />} text="Mother" disabled={disabled} onClick={() => A.addMother(n)} />
+        <Tool title="Add a mother above (P)" icon={<IMother />} text="New mother" disabled={disabled} onClick={() => A.addMother(n)} />
         <Tool
           title={scopeThis ? 'Triangle over this copy only (the other copies stay as they are)' : t('triangle')}
           icon={<ITriangle />}
@@ -342,6 +340,8 @@ function NodePanel({ n }: { n: DNode }) {
           active={scopeThis ? !!inst?.triangle : !!n.triangle || !!n.parents[0]?.triangle}
           onClick={() => A.toggleTriangle(n)}
         />
+        <Tool title="Remerge a constituent as daughter" icon={<ICopyNode />} text="Remerged daughter" disabled={disabled} onClick={()=>A.startPick('daughter',n)}/>
+        <Tool title="Remerge a constituent as sister" icon={<ICopyNode />} text="Remerged sister" disabled={disabled||!n.parents.length} onClick={()=>A.startPick('sister',n)}/>
         <Tool title="Draw an arrow from here, then click the target (M)" icon={<IArrowTool />} text="Arrow" onClick={() => A.startArrow(n)} />
         <Tool title={t('delete')} icon={<ITrash />} text="Delete" danger disabled={disabled} onClick={() => A.deleteNode(n)} />
       </ToolRow>
@@ -350,16 +350,17 @@ function NodePanel({ n }: { n: DNode }) {
         <Group title="Branching" hint="Swaps the two daughters">
           <div class="row tight">
             <button class="btn small" onClick={() => A.restructure(n, 'left')} disabled={disabled} title="[XP X [Z]] → [XP [Z] X]">
-              ← left
+              ← Left
             </button>
             <button class="btn small" onClick={() => A.restructure(n, 'right')} disabled={disabled} title="[XP [Z] X] → [XP X [Z]]">
-              right →
+              Right →
             </button>
           </div>
         </Group>
       )}
 
       <Group title="Movement">
+        {!inChain && !ref && <p class="hint">Not part of a movement chain. Use <strong>Arrow</strong> (<kbd>M</kbd>) and click the landing site to move it.</p>}
         {inChain && (
           <button class="btn small" onClick={() => A.togglePronounce(n)}>
             {overt ? 'Silence this position' : 'Pronounce this position'}

@@ -12,14 +12,14 @@ import {
   activateTree, activeId, addTree, arrowSource, build, error, linkedIds, mobileTab, modal, paneWidths, pick, relationOf, removeTree, renameTree, requestLabelFocus, scene, selection, shareUrl, showToast, sideTab, source, theme, toast, tool, tree, unlinkTree,
 } from '../state';
 import { Canvas, canvasApi } from './Canvas';
-import { Seg } from './controls';
+import { Seg, useDismiss } from './controls';
 import { Help, MyTrees, Shortcuts } from './Dialogs';
 import { Editor } from './Editor';
 import { ExportDialog } from './ExportDialog';
 import { CheckBanner, GradingLog, logOpen } from '../classroom/Checker';
 import { SHARING_ENABLED, XBAR_ENABLED } from '../classroom/config';
 import { appClipboard } from '../classroom/clipboard';
-import { IAuto, IBook, IChevron, IHelp, IDownload, IEdit, IFolder, IFormat, IKeyboard, ILink, IMoon, IMore, IPlus, IRedo, ISliders, ISun, IUndo, IClose } from './icons';
+import { IAuto, IBook, IChevron, IHelp, IDownload, IEdit, IFolder, IFormat, IKeyboard, ILink, IMoon, IMore, INano, IPlus, IRedo, ISliders, ISun, IUndo, IClose } from './icons';
 import { Inspector } from './Inspector';
 import { NanosyntaxPanel } from './NanosyntaxPanel';
 import { loadCanvasExample } from '../nanosyntax';
@@ -246,17 +246,11 @@ function useShortcuts() {
 
 function ExamplesMenu() {
   const open = useSignal(false);
-  useEffect(() => {
-    const close = (e: PointerEvent) => {
-      if (!(e.target as Element).closest('.examples')) open.value = false;
-    };
-    window.addEventListener('pointerdown', close);
-    return () => window.removeEventListener('pointerdown', close);
-  }, []);
+  useDismiss('.examples', () => open.value, () => (open.value = false));
   return (
     <div class="examples menu">
       <button class="btn ghost" aria-haspopup="true" aria-expanded={open.value} onClick={() => (open.value = !open.value)} data-testid="examples-button">
-        <IBook size={17} /> <span class="hide-sm">{t('examples')}</span> <IChevron size={14} />
+        <IBook size={17} /> <span class="hide-sm">{t('examples')}</span> <IChevron size={14} class="chev" />
       </button>
       {open.value && (
         <div class="menu-pop" role="menu">
@@ -335,13 +329,7 @@ function OverrideQuestion() {
 /** Saving to and opening from disk, and the trees kept in this browser. */
 function FileMenu() {
   const open = useSignal(false);
-  useEffect(() => {
-    const close = (e: PointerEvent) => {
-      if (!(e.target as Element).closest('.file-menu')) open.value = false;
-    };
-    window.addEventListener('pointerdown', close);
-    return () => window.removeEventListener('pointerdown', close);
-  }, []);
+  useDismiss('.file-menu', () => open.value, () => (open.value = false));
   const run = (f: () => void) => () => {
     open.value = false;
     f();
@@ -352,7 +340,7 @@ function FileMenu() {
       <button class="btn ghost" aria-haspopup="true" aria-expanded={open.value} onClick={() => (open.value = !open.value)} title={name ? `File: ${name}${SHARING_ENABLED && unsaved.value ? ' (unsaved changes)' : ''}` : SHARING_ENABLED ? 'Save to disk, open, my trees' : 'My trees'} data-testid="file-menu">
         <IFolder size={17} /> <span class="hide-md file-label">{name ?? 'File'}</span>
         {SHARING_ENABLED && unsaved.value && <span class="unsaved-dot" title="Unsaved changes" />}
-        <IChevron size={14} />
+        <IChevron size={14} class="chev" />
       </button>
       {open.value && (
         <div class="menu-pop file-pop" role="menu">
@@ -400,13 +388,7 @@ function TreeTabs() {
   const menuAt = useSignal<{ left: number; top: number }>({ left: 0, top: 0 });
   const editing = useSignal<string | null>(null);
   const linked = linkedIds.value;
-  useEffect(() => {
-    const close = (e: PointerEvent) => {
-      if (!(e.target as Element).closest('.tree-tabs')) menu.value = null;
-    };
-    window.addEventListener('pointerdown', close);
-    return () => window.removeEventListener('pointerdown', close);
-  }, []);
+  useDismiss('.tree-tabs', () => menu.value !== null, () => (menu.value = null));
   const list = visibleTrees.value;
   return (
     <div class="tree-tabs" role="tablist" aria-label="Trees on the canvas">
@@ -473,6 +455,9 @@ function TreeTabs() {
       ))}
       <button class="icon-btn small add-tree" title="New tree on the canvas" aria-label="New tree" onClick={() => addTree()}>
         <IPlus size={15} />
+      </button>
+      <button class="icon-btn small format-btn" title="Lay out the code: line breaks and indentation (Shift+Alt+F)" aria-label="Format the code" onClick={() => A.formatCode()}>
+        <IFormat size={15} />
       </button>
       <button class="icon-btn small code-hide" title="Hide the code (more room for the canvas)" aria-label="Hide the code" onClick={() => (paneWidths.value = { ...paneWidths.value, codeHidden: true })}>
         <IChevron size={14} />
@@ -566,11 +551,13 @@ export function App() {
           </svg>
           <div>
             <h1>NanoTrees</h1>
-            <span class="tagline hide-sm">{t('appTagline')} · by Gleb Bubnov</span>
+            <span class="tagline hide-md">{t('appTagline')} · by Gleb Bubnov</span>
           </div>
         </div>
         <ExamplesMenu />
-        <button class={`btn ghost nanosyntax-toggle ${nanosyntaxEnabled.value ? 'active' : ''}`} title="Show or hide nanosyntax" data-testid="nanosyntax-toggle" aria-pressed={nanosyntaxEnabled.value} onClick={toggleNanosyntax}>Nanosyntax</button>
+        <button class={`btn ghost nanosyntax-toggle ${nanosyntaxEnabled.value ? 'active' : ''}`} title="Show or hide nanosyntax" data-testid="nanosyntax-toggle" aria-pressed={nanosyntaxEnabled.value} aria-label="Nanosyntax" onClick={toggleNanosyntax}>
+          <INano size={17} /> <span class="hide-xs">Nanosyntax</span>
+        </button>
         {XBAR_ENABLED && (
           <div class="mode-switch hide-xs" title="Labelling">
             <Seg value={b.mode} onChange={(v) => applyBuild({ mode: v })} options={[
@@ -635,9 +622,6 @@ export function App() {
           <TreeTabs />
           <div class="editor-wrap">
             <Editor />
-            <button class="icon-btn small format-btn" title="Lay out the code: line breaks and indentation (Shift+Alt+F)" aria-label="Format the code" onClick={() => A.formatCode()}>
-              <IFormat size={15} />
-            </button>
           </div>
           <StatusBar />
           <Splitter side="right" label="Width of the code" onReset={() => (paneWidths.value = { ...paneWidths.value, code: null })} onDrag={(dx, w0) => (paneWidths.value = { ...paneWidths.value, code: clampW(w0 + dx, 220) })} />
@@ -659,7 +643,7 @@ export function App() {
             <button role="tab" aria-selected={sideTab.value === 'appearance'} class={sideTab.value === 'appearance' ? 'on' : ''} onClick={() => (sideTab.value = 'appearance')} data-testid="side-appearance">
               <ISliders size={15} /> {t('settings')}
             </button>
-            {nanosyntaxEnabled.value && <button role="tab" aria-selected={sideTab.value === 'nanosyntax'} class={sideTab.value === 'nanosyntax' ? 'on' : ''} onClick={() => sideTab.value = 'nanosyntax'} data-testid="side-nanosyntax">Nanosyntax</button>}
+            {nanosyntaxEnabled.value && <button role="tab" aria-selected={sideTab.value === 'nanosyntax'} class={sideTab.value === 'nanosyntax' ? 'on' : ''} onClick={() => sideTab.value = 'nanosyntax'} data-testid="side-nanosyntax"><INano size={15} /> Nanosyntax</button>}
             <button
               class="icon-btn small side-close"
               title="Close"
