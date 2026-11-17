@@ -14,7 +14,7 @@ import type { Scene } from './core/scene';
 import { defaultStyle, fontCss, restoreStyle } from './core/style';
 import type { TreeStyle } from './core/style';
 import { examples } from './examples';
-import { XBAR_ENABLED } from './classroom/config';
+import { SHARING_ENABLED, XBAR_ENABLED } from './classroom/config';
 import type { Example } from './examples';
 import type { LexicalEntry, NSAlgorithm, NSAlgorithmSettings, DerivationStep } from './core/nanosyntax';
 import { derivationDisplaySource, lexicalEntrySource, resolveNSAlgorithm } from './core/nanosyntax';
@@ -985,7 +985,7 @@ export function shareUrl(): string {
 
 export function readHash(): Snapshot | null {
   const m = /[#&]t=([^&]+)/.exec(location.hash);
-  if (!m) return null;
+  if (!m || !SHARING_ENABLED) return null;
   try {
     const json = decompressFromEncodedURIComponent(m[1]);
     if (!json) return null;

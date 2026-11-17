@@ -7,6 +7,7 @@ import { initState, showToast } from './state';
 import { startLinkSync } from './linksync';
 import { App } from './ui/App';
 import { logOpen, openStamp, readCheckLink } from './classroom/Checker';
+import { SHARING_ENABLED } from './classroom/config';
 
 installFontFaces();
 document.documentElement.lang = 'en';
@@ -22,6 +23,11 @@ const fromHash = () => {
 if (!checkLink && /^#check\b/.test(location.hash)) logOpen.value = true;
 window.addEventListener('hashchange', fromHash);
 startLinkSync();
+if (!SHARING_ENABLED && /[#&]t=/.test(location.hash)) {
+  // a share link from another copy of NanoTrees: not opened in the classroom edition
+  history.replaceState(null, '', location.pathname + location.search);
+  setTimeout(() => showToast('Shared links are turned off in this edition.'), 300);
+}
 if (origin === 'link') {
   // the link has been read; later edits are autosaved instead
   history.replaceState(null, '', location.pathname + location.search);

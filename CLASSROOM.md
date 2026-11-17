@@ -10,6 +10,8 @@ A fork of [NanoTrees](https://github.com/interprole/tree) (MIT) for assignments 
 - the ID and a tree fingerprint together in one corner (the export time and check code are in the QR code);
 - a QR code in another corner holding the tree as exported, the student ID, the time and a signature (HMAC-SHA256) over all of them.
 
+**Sharing (off by default).** Files, share links and the clipboard can all carry trees from one student to another. This edition builds without them: Save to disk, Save as, Open from disk, keeping a file up to date, the Share button and the Copy bracket notation buttons are hidden; Ctrl+S and Ctrl+O only show a note; dropped files are not opened; and a share link opens the page without its trees. Copy, cut and paste still work inside the app (in the code and on the canvas, also between trees), but through the app's own clipboard: nothing copied in NanoTrees reaches other apps, and nothing copied elsewhere can be pasted into the code. Students' trees are still kept in their browser (My trees). This stops casual sharing, not a determined student, who can still retype a tree or read it off a screenshot. To turn sharing back on, build with `VITE_CLASS_SHARING=on` (on GitHub, the repository variable `CLASS_SHARING`).
+
 **X-bar mode (off by default).** X-bar mode fills in XP → X′ → X projections by itself, which gives the answer away on X-bar assignments, so this edition builds without it: the Labelling switch and the X-bar example are hidden, and saved files or shared links that ask for X-bar mode open in manual mode. To turn it back on, build with `VITE_CLASS_XBAR=on` (on GitHub, the repository variable `CLASS_XBAR`). The checker notes any export that was made in X-bar mode.
 
 **Checking (instructor).** Scan a printed QR code with a phone camera: it opens this page with the student's tree loaded and a banner that says whether the signature is valid, whose export it is, and which other checked students handed in the same tree. Changing the ID, the time or the tree in the QR code makes the signature fail.
@@ -26,7 +28,7 @@ The tree fingerprint depends only on the tree's structure and labels, not on the
 ## Setup
 
 1. Fork this repository on GitHub.
-2. Settings → Secrets and variables → Actions: add a repository **secret** `CLASS_SECRET` (any long random string), and optionally a **variable** `CLASS_NAME` (shown in the PNG footer, e.g. "Intro to Syntax, Fall 2026"). Set a variable `CLASS_XBAR` to `on` only if students may use X-bar mode.
+2. Settings → Secrets and variables → Actions: add a repository **secret** `CLASS_SECRET` (any long random string), and optionally a **variable** `CLASS_NAME` (shown in the PNG footer, e.g. "Intro to Syntax, Fall 2026"). Set a variable `CLASS_XBAR` to `on` only if students may use X-bar mode, and `CLASS_SHARING` to `on` only if they may save and open .nanotrees files and use share links.
 3. Settings → Pages → Source: **GitHub Actions**.
 4. Push to `main` (or run the workflow by hand). The site appears at `https://<user>.github.io/<repo>/`.
 

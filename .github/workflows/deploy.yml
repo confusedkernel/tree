@@ -30,6 +30,7 @@ jobs:
           VITE_CLASS_SECRET: ${{ secrets.CLASS_SECRET }}
           VITE_CLASS_NAME: ${{ vars.CLASS_NAME }}
           VITE_CLASS_XBAR: ${{ vars.CLASS_XBAR }}
+          VITE_CLASS_SHARING: ${{ vars.CLASS_SHARING }}
       - uses: actions/configure-pages@v5
         with:
           enablement: true

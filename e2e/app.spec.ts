@@ -117,6 +117,7 @@ test('c-command and dominance have no toolbar controls or C/D shortcuts',async({
 });
 
 test('share link restores tree and settings', async ({ page, context }) => {
+  test.skip(process.env.VITE_CLASS_SHARING !== 'on', 'sharing is off unless built with VITE_CLASS_SHARING=on');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('./');
   await setCode(page, '[XP [Y share me]]');
@@ -506,6 +507,7 @@ test('phrasal movement: copies; categories must match', async ({ page }) => {
 });
 
 test('save the canvas to disk and open it again (download where files cannot be written)', async ({ page }) => {
+  test.skip(process.env.VITE_CLASS_SHARING !== 'on', 'sharing is off unless built with VITE_CLASS_SHARING=on');
   await page.addInitScript(() => {
     const w = window as unknown as Record<string, unknown>;
     w.showSaveFilePicker = undefined;
@@ -534,6 +536,7 @@ test('save the canvas to disk and open it again (download where files cannot be 
 });
 
 test('save into a connected file, again with Ctrl+S, and keep it up to date', async ({ page }) => {
+  test.skip(process.env.VITE_CLASS_SHARING !== 'on', 'sharing is off unless built with VITE_CLASS_SHARING=on');
   await page.addInitScript(() => {
     const files: Record<string, string> = {};
     const w = window as unknown as Record<string, unknown>;

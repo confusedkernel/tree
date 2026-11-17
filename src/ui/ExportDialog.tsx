@@ -6,6 +6,7 @@ import { activeTree, currentName, modal, scene, showToast, snapshot, source, tre
 import { Modal, Seg } from './controls';
 import { ICopy, IDownload } from './icons';
 import { ID_PATTERN, normId, sign, stampPng } from '../classroom/stamp';
+import { SHARING_ENABLED } from '../classroom/config';
 
 /**
  * Classroom edition: the only image export is a PNG stamped with the student ID, the time,
@@ -108,16 +109,18 @@ export function ExportDialog() {
               <ICopy size={16} /> {t('copyImage')}
             </button>
           </div>
-          <div class="row wrap">
-            <button class="btn" onClick={async () => (await copyText(source.value)) && showToast(t('copied'))}>
-              <ICopy size={16} /> {t('copyBrackets')}
-            </button>
-            {tr && (
-              <button class="btn" onClick={async () => (await copyText(serialize(tr))) && showToast(t('copied'))}>
-                <ICopy size={16} /> {t('copyBracketsShown')}
+          {SHARING_ENABLED && (
+            <div class="row wrap">
+              <button class="btn" onClick={async () => (await copyText(source.value)) && showToast(t('copied'))}>
+                <ICopy size={16} /> {t('copyBrackets')}
               </button>
-            )}
-          </div>
+              {tr && (
+                <button class="btn" onClick={async () => (await copyText(serialize(tr))) && showToast(t('copied'))}>
+                  <ICopy size={16} /> {t('copyBracketsShown')}
+                </button>
+              )}
+            </div>
+          )}
           {busy.value && <p class="hint">{t('exporting')}</p>}
         </div>
       )}

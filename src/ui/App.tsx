@@ -17,7 +17,8 @@ import { Help, MyTrees, Shortcuts } from './Dialogs';
 import { Editor } from './Editor';
 import { ExportDialog } from './ExportDialog';
 import { CheckBanner, GradingLog, logOpen } from '../classroom/Checker';
-import { XBAR_ENABLED } from '../classroom/config';
+import { SHARING_ENABLED, XBAR_ENABLED } from '../classroom/config';
+import { appClipboard } from '../classroom/clipboard';
 import { IAuto, IBook, IChevron, IHelp, IDownload, IEdit, IFolder, IFormat, IKeyboard, ILink, IMoon, IMore, IPlus, IRedo, ISliders, ISun, IUndo, IClose } from './icons';
 import { Inspector } from './Inspector';
 import { NanosyntaxPanel } from './NanosyntaxPanel';
@@ -101,13 +102,15 @@ function useShortcuts() {
       const c = A.copyNode();
       if (!c) return;
       e.preventDefault();
-      e.clipboardData?.setData('text/plain', A.clipText(c));
+      // classroom edition: the copy goes to the app's own clipboard, not the system one
+      if (SHARING_ENABLED) e.clipboardData?.setData('text/plain', A.clipText(c));
+      else appClipboard.text = A.clipText(c);
       if (e.type === 'cut') A.deleteNode();
       else showToast('Copied: Ctrl+V pastes it as a daughter, Ctrl+Shift+V as a sister, or as a new tree when nothing is selected.');
     };
     const onPaste = (e: ClipboardEvent) => {
       if (busy(e)) return;
-      const c = A.clipFromText(e.clipboardData?.getData('text/plain') ?? '') ?? A.clip.value;
+      const c = A.clipFromText(SHARING_ENABLED ? e.clipboardData?.getData('text/plain') ?? '' : appClipboard.text) ?? A.clip.value;
       if (!c) return;
       e.preventDefault();
       A.paste(c, A.selectedNode(), sister ? 'sister' : 'daughter');
@@ -346,26 +349,32 @@ function FileMenu() {
   const name = fileName.value;
   return (
     <div class="file-menu menu">
-      <button class="btn ghost" aria-haspopup="true" aria-expanded={open.value} onClick={() => (open.value = !open.value)} title={name ? `File: ${name}${unsaved.value ? ' (unsaved changes)' : ''}` : 'Save to disk, open, my trees'} data-testid="file-menu">
+      <button class="btn ghost" aria-haspopup="true" aria-expanded={open.value} onClick={() => (open.value = !open.value)} title={name ? `File: ${name}${SHARING_ENABLED && unsaved.value ? ' (unsaved changes)' : ''}` : SHARING_ENABLED ? 'Save to disk, open, my trees' : 'My trees'} data-testid="file-menu">
         <IFolder size={17} /> <span class="hide-md file-label">{name ?? 'File'}</span>
-        {unsaved.value && <span class="unsaved-dot" title="Unsaved changes" />}
+        {SHARING_ENABLED && unsaved.value && <span class="unsaved-dot" title="Unsaved changes" />}
         <IChevron size={14} />
       </button>
       {open.value && (
         <div class="menu-pop file-pop" role="menu">
-          <button role="menuitem" onClick={run(() => void saveToDisk())}>
-            <strong>Save to disk <kbd>Ctrl S</kbd></strong>
-            <small>{fileHandle.value ? `Into ${fileHandle.value.name}` : `All trees of the canvas in one ${canWriteFiles() ? 'file' : 'file (downloaded)'}.`}</small>
-          </button>
-          <button role="menuitem" onClick={run(() => void saveToDisk(true))}>
-            <strong>Save as… <kbd>Ctrl Shift S</kbd></strong>
-            <small>A new file.</small>
-          </button>
-          <button role="menuitem" onClick={run(() => void openFromDisk())}>
-            <strong>Open from disk… <kbd>Ctrl O</kbd></strong>
-            <small>A saved .nanotrees file, or bracket code (.txt). You can also drop a file onto the window.</small>
-          </button>
-          {fileHandle.value && (
+          {SHARING_ENABLED && (
+            <>
+              <button role="menuitem" onClick={run(() => void saveToDisk())}>
+                <strong>Save to disk <kbd>Ctrl S</kbd></strong>
+                <small>{fileHandle.value ? `Into ${fileHandle.value.name}` : `All trees of the canvas in one ${canWriteFiles() ? 'file' : 'file (downloaded)'}.`}</small>
+              </button>
+              <button role="menuitem" onClick={run(() => void saveToDisk(true))}>
+                <strong>Save as… <kbd>Ctrl Shift S</kbd></strong>
+                <small>A new file.</small>
+              </button>
+            </>
+          )}
+          {SHARING_ENABLED && (
+            <button role="menuitem" onClick={run(() => void openFromDisk())}>
+              <strong>Open from disk… <kbd>Ctrl O</kbd></strong>
+              <small>A saved .nanotrees file, or bracket code (.txt). You can also drop a file onto the window.</small>
+            </button>
+          )}
+          {SHARING_ENABLED && fileHandle.value && (
             <label class="menu-toggle">
               <input type="checkbox" checked={autoSaveFile.value} onChange={(e) => (autoSaveFile.value = (e.target as HTMLInputElement).checked)} />
               <span>
@@ -587,9 +596,11 @@ export function App() {
           </button>
           <span class="sep hide-xs" />
           <FileMenu />
-          <button class="btn ghost" onClick={share} title={t('share')} data-testid="share">
-            <ILink size={17} /> <span class="hide-md">{t('share')}</span>
-          </button>
+          {SHARING_ENABLED && (
+            <button class="btn ghost" onClick={share} title={t('share')} data-testid="share">
+              <ILink size={17} /> <span class="hide-md">{t('share')}</span>
+            </button>
+          )}
           <button class="btn primary" onClick={() => (modal.value = 'export')} disabled={!scene.value} data-testid="export">
             <IDownload size={17} /> <span class="hide-sm">{t('export')}</span>
           </button>

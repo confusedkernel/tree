@@ -1,4 +1,5 @@
 import { computed, effect, signal } from '@preact/signals';
+import { SHARING_ENABLED } from './classroom/config';
 import { currentName, restore, showToast, snapshot } from './state';
 import type { Snapshot } from './state';
 
@@ -63,6 +64,10 @@ async function write(handle: FileSystemFileHandle, text: string) {
 
 /** Save to disk: into the connected file, or a new one (saveAs, or nothing connected yet). */
 export async function saveToDisk(saveAs = false) {
+  if (!SHARING_ENABLED) {
+    showToast('Saving to a file is turned off in this edition. Your trees are kept in this browser; export a PNG to hand them in.');
+    return;
+  }
   const text = fileText();
   const json = current();
   try {
@@ -87,6 +92,10 @@ export async function saveToDisk(saveAs = false) {
 
 /** Open a file from disk (a saved canvas, or plain bracket code). */
 export async function openFromDisk() {
+  if (!SHARING_ENABLED) {
+    showToast('Opening files is turned off in this edition. Your trees are kept in this browser (My trees).');
+    return;
+  }
   if (unsaved.value && !confirm(`${fileName.value} has unsaved changes. Open another file anyway?`)) return;
   try {
     const p = picker();
@@ -118,6 +127,10 @@ function chooseFile(): Promise<File | null> {
 
 /** Read a file into the canvas. Returns what it was. */
 export async function loadFile(file: File): Promise<'canvas' | 'code' | null> {
+  if (!SHARING_ENABLED) {
+    showToast('Opening files is turned off in this edition. Your trees are kept in this browser (My trees).');
+    return null;
+  }
   const text = await file.text();
   const kind = loadText(text);
   if (!kind) {
@@ -135,6 +148,7 @@ export async function loadFile(file: File): Promise<'canvas' | 'code' | null> {
 /** A saved canvas (JSON), or bracket code as a single tree. */
 export function loadText(text: string): 'canvas' | 'code' | null {
   const t = text.trim();
+  if (!SHARING_ENABLED) return null; // opening files is off in the classroom edition
   if (t.startsWith('{')) {
     try {
       const data = JSON.parse(t) as Partial<FileFormat> & Partial<Snapshot>;
@@ -165,7 +179,7 @@ export function download(data: string, filename: string, type = 'application/jso
 // keep the connected file up to date
 let timer: ReturnType<typeof setTimeout> | undefined;
 effect(() => {
-  const go = autoSaveFile.value && fileHandle.value && unsaved.value;
+  const go = SHARING_ENABLED && autoSaveFile.value && fileHandle.value && unsaved.value;
   clearTimeout(timer);
   if (!go) return;
   timer = setTimeout(async () => {

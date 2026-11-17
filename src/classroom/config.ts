@@ -16,4 +16,12 @@ export const CLASS_NAME: string = (import.meta.env.VITE_CLASS_NAME as string | u
  * is hidden and any saved file, link or example that asks for it opens in manual mode.
  */
 export const XBAR_ENABLED: boolean = import.meta.env.VITE_CLASS_XBAR === 'on';
+/**
+ * Everything that carries a tree from one student to another is off unless the site is built with
+ * VITE_CLASS_SHARING=on: saving and opening files, share links (#t=…), and code going through the
+ * system clipboard. Copy, cut and paste in the code editor and on the canvas then use the app's
+ * own clipboard (classroom/clipboard.ts), so code moves freely inside the app but not in or out;
+ * the Copy bracket notation buttons are hidden. The PNG export and My trees still work.
+ */
+export const SHARING_ENABLED: boolean = import.meta.env.VITE_CLASS_SHARING === 'on';
 export const USING_DEFAULT_SECRET = !import.meta.env.VITE_CLASS_SECRET;

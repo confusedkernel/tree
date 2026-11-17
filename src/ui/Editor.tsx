@@ -12,7 +12,9 @@ import { tags } from '@lezer/highlight';
 import { formatCode, setEditorBridge } from '../actions';
 import { MACROS, TEXT_COMMANDS } from '../core/richtext';
 import { t } from '../i18n';
-import { activeTree, error, parsed, selection, source, tree } from '../state';
+import { activeTree, error, parsed, selection, showToast, source, tree } from '../state';
+import { SHARING_ENABLED } from '../classroom/config';
+import { appClipboard } from '../classroom/clipboard';
 
 /* ------------------------------------------------------------ highlighting */
 
@@ -256,6 +258,33 @@ export function Editor() {
         }
       }),
     ];
+    if (!SHARING_ENABLED) {
+      // classroom edition: copy, cut and paste use the app's own clipboard, never the system one,
+      // and text is not dragged in or out
+      const selected = (v: EditorView) =>
+        v.state.selection.ranges
+          .filter((r) => !r.empty)
+          .map((r) => v.state.sliceDoc(r.from, r.to))
+          .join('\n');
+      const copy = (e: ClipboardEvent, v: EditorView) => {
+        e.preventDefault();
+        const text = selected(v);
+        if (text) appClipboard.text = text;
+        if (text && e.type === 'cut') v.dispatch(v.state.replaceSelection(''), { userEvent: 'delete.cut', scrollIntoView: true });
+        return true;
+      };
+      const paste = (e: ClipboardEvent, v: EditorView) => {
+        e.preventDefault();
+        if (appClipboard.text) v.dispatch(v.state.replaceSelection(appClipboard.text), { userEvent: 'input.paste', scrollIntoView: true });
+        else showToast('Only code copied inside NanoTrees can be pasted here.');
+        return true;
+      };
+      const block = (e: DragEvent) => {
+        e.preventDefault();
+        return true;
+      };
+      extensions.push(EditorView.domEventHandlers({ copy, cut: copy, paste, drop: block, dragstart: block }));
+    }
     const make = (doc: string) => EditorState.create({ doc, extensions });
     view = new EditorView({ parent: host.current!, state: make(source.value) });
     // every code of the canvas keeps its own editor state (and undo history); linked copies share one
