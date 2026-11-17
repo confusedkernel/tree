@@ -4,7 +4,7 @@ import { parse } from '../core/parser';
 import { buildTree, defaultBuildOptions } from '../core/build';
 import type { BuildOptions } from '../core/build';
 import { serialize } from '../core/serialize';
-import { CLASS_NAME, CLASS_SECRET } from './config';
+import { CLASS_SECRET } from './config';
 import { base32, hmacSha256, sha256Hex } from './crypto';
 
 /** What the QR code carries: who exported which tree, when, and a signature over all of it. */
@@ -105,27 +105,119 @@ export function formatTime(t: number, z: number): string {
 
 /* ------------------------------------------------------------ stamped PNG */
 
+/** How much smaller (as a fraction of the area) a layout using a top corner must make the image to be picked. */
+const TOP_CORNER_GAIN = 0.9;
+
 /**
- * Puts the tree on white, with the student ID faintly repeated behind it, and adds a footer
- * with the ID, time, tree fingerprint, check code and QR code.
+ * Puts the tree on white with the student ID faintly repeated across the image, and two blocks in
+ * corners of the image: the QR code, and the ID with the tree fingerprint. They go in the bottom
+ * corners (QR code on the right by default) or, when that makes the image clearly smaller, a top
+ * corner, using empty space beside the tree where there is room.
  * `treePng` must have a transparent background, so the watermark shows through.
  */
 export async function stampPng(treePng: Blob, scale: number, st: Stamp): Promise<Blob> {
   const img = await createImageBitmap(treePng);
   const u = scale;
-  const pad = Math.round(16 * u);
+  const pad = Math.round(10 * u);
+  const gap = Math.round(8 * u); // clearance between the tree and the corner blocks
+
+  // the tree's drawn pixels: crop its transparent margins and find where the corners can go
+  const src = document.createElement('canvas');
+  src.width = img.width;
+  src.height = img.height;
+  const sctx = src.getContext('2d', { willReadFrequently: true })!;
+  sctx.drawImage(img, 0, 0);
+  const alpha = sctx.getImageData(0, 0, img.width, img.height).data;
+  const ink = (x: number, y: number) => alpha[(y * img.width + x) * 4 + 3] > 8;
+  let x0 = img.width, y0 = img.height, x1 = -1, y1 = -1;
+  const colTop = new Int32Array(img.width).fill(-1); // first and last inked row of each column
+  const colBot = new Int32Array(img.width).fill(-1);
+  for (let y = 0; y < img.height; y++)
+    for (let x = 0; x < img.width; x++)
+      if (ink(x, y)) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        y1 = y;
+        if (colTop[x] < 0) colTop[x] = y;
+        colBot[x] = y;
+      }
+  if (x1 < 0) (x0 = 0), (y0 = 0), (x1 = img.width - 1), (y1 = img.height - 1);
+  const tw = x1 - x0 + 1;
+  const th = y1 - y0 + 1;
 
   const qr = qrcode(0, 'M');
   qr.addData(qrText(st), 'Byte');
   qr.make();
   const n = qr.getModuleCount();
-  const cell = Math.max(2, Math.round((118 * u) / (n + 8)));
-  const qrSize = cell * (n + 8);
+  const quiet = 2; // modules of white around the code, kept clear of the watermark
+  const cell = Math.max(2, Math.round((76 * u) / (n + 2 * quiet)));
+  const qrSize = cell * (n + 2 * quiet);
 
-  const textW = Math.round(330 * u);
-  const W = Math.max(img.width + 2 * pad, textW + qrSize + 3 * pad);
-  const footerH = qrSize + 2 * pad;
-  const H = img.height + 2 * pad + footerH;
+  const font = (px: number, w = 400) => `${w} ${Math.round(px * u)}px system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif`;
+  const idText = `Student ID: ${st.id}`;
+  const hashText = `Tree ${fingerprint(st.s, st.b)}`;
+  sctx.font = font(11.5, 650);
+  const idW = sctx.measureText(idText).width;
+  sctx.font = font(9.5);
+  const textW = Math.ceil(Math.max(idW, sctx.measureText(hashText).width));
+  const textH = Math.round(32 * u);
+
+  // Try every pair of corners for the two blocks and keep the smallest image. A block in a corner
+  // that the tree reaches pushes the image taller by just enough to clear the tree.
+  type Corner = { top: boolean; left: boolean };
+  type Placed = { corner: Corner; w: number; h: number; x: number; y: number };
+  const corners: Corner[] = [
+    { top: false, left: false },
+    { top: false, left: true },
+    { top: true, left: false },
+    { top: true, left: true },
+  ];
+  // how many rows of canvas columns a..b the tree's ink covers, counted from the tree's bottom edge
+  // (for a block in a top corner) or from its top edge (for a block in a bottom corner)
+  const reach = (W: number, a: number, b: number, forTop: boolean) => {
+    const tx = Math.round((W - tw) / 2);
+    let r = -Infinity;
+    for (let x = Math.max(x0, a - gap - tx + x0); x <= Math.min(x1, b + gap - tx + x0); x++) {
+      if (colTop[x] < 0) continue;
+      r = Math.max(r, forTop ? y1 - colTop[x] + 1 : colBot[x] - y0 + 1);
+    }
+    return r;
+  };
+  let best: { W: number; H: number; score: number; top: number; blocks: Placed[] } | null = null;
+  for (const qc of corners)
+    for (const tc of corners) {
+      if (qc === tc) continue;
+      // never narrower than the two blocks side by side, so small trees get a tidy row underneath
+      const W = Math.max(tw + 2 * pad, qrSize + textW + 3 * pad);
+      let extraTop = 0;
+      let extraBottom = 0;
+      const blocks: Placed[] = [
+        { corner: qc, w: qrSize, h: qrSize, x: 0, y: 0 },
+        { corner: tc, w: textW, h: textH, x: 0, y: 0 },
+      ];
+      for (const bl of blocks) {
+        bl.x = bl.corner.left ? pad : W - pad - bl.w;
+        // rows free of ink at the block's edge of the tree, in the block's columns
+        const free = th - reach(W, bl.x, bl.x + bl.w, bl.corner.top);
+        const need = Math.max(0, bl.h + gap - free);
+        if (bl.corner.top) extraTop = Math.max(extraTop, need);
+        else extraBottom = Math.max(extraBottom, need);
+      }
+      // the blocks must fit between top and bottom too, one above the other when their columns overlap
+      const [q, t] = blocks;
+      const overlap = q.x < t.x + t.w + gap && t.x < q.x + q.w + gap;
+      const stacked = overlap ? qrSize + gap + textH : Math.max(qrSize, textH);
+      extraBottom += Math.max(0, stacked - (extraTop + th + extraBottom));
+      const H = pad + extraTop + th + extraBottom + pad;
+      for (const bl of blocks) bl.y = bl.corner.top ? pad : H - pad - bl.h;
+      // bottom corners are the default; a top corner has to make the image at least 10% smaller
+      const score = (W * H) / (qc.top || tc.top ? TOP_CORNER_GAIN : 1);
+      if (!best || score < best.score) best = { W, H, score, top: pad + extraTop, blocks };
+    }
+  const { W, H, top: ty, blocks } = best!;
+  const tx = Math.round((W - tw) / 2);
+  const [qb, tb] = blocks;
 
   const c = document.createElement('canvas');
   c.width = W;
@@ -134,63 +226,44 @@ export async function stampPng(treePng: Blob, scale: number, st: Stamp): Promise
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
-  // watermark behind the tree: the ID on a diagonal, light enough not to get in the way
-  const treeTop = pad;
-  const treeH = img.height;
+  // watermark over the whole image: the ID on a diagonal, light enough not to get in the way
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, W, treeTop + treeH + pad);
-  ctx.clip();
-  ctx.translate(W / 2, treeTop + treeH / 2);
+  ctx.translate(W / 2, H / 2);
   ctx.rotate(-Math.PI / 9);
   ctx.fillStyle = 'rgba(0, 0, 0, 0.045)';
-  ctx.font = `600 ${Math.round(18 * u)}px system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif`;
+  ctx.font = font(18, 600);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const mark = st.id;
-  const step = ctx.measureText(mark).width + 70 * u;
+  const step = ctx.measureText(st.id).width + 70 * u;
   const rowH = 54 * u;
-  const span = Math.hypot(W, treeH + 2 * pad);
+  const span = Math.hypot(W, H);
   for (let y = -span / 2, row = 0; y <= span / 2; y += rowH, row++) {
-    for (let x = -span / 2 + (row % 2) * (step / 2); x <= span / 2; x += step) ctx.fillText(mark, x, y);
+    for (let x = -span / 2 + (row % 2) * (step / 2); x <= span / 2; x += step) ctx.fillText(st.id, x, y);
   }
   ctx.restore();
 
-  ctx.drawImage(img, Math.round((W - img.width) / 2), treeTop);
+  ctx.drawImage(img, x0, y0, tw, th, tx, ty, tw, th);
 
-  // footer
-  const fy = img.height + 2 * pad;
-  ctx.fillStyle = '#f3f3f1';
-  ctx.fillRect(0, fy, W, footerH);
-  ctx.fillStyle = '#9a9a96';
-  ctx.fillRect(0, fy, W, Math.max(1, Math.round(u)));
-
-  const qx = W - pad - qrSize;
-  const qy = fy + pad;
+  // QR code
+  const qx = qb.x;
+  const qy = qb.y;
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(qx, qy, qrSize, qrSize);
   ctx.fillStyle = '#000000';
-  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (qr.isDark(r, k)) ctx.fillRect(qx + (k + 4) * cell, qy + (r + 4) * cell, cell, cell);
+  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (qr.isDark(r, k)) ctx.fillRect(qx + (k + quiet) * cell, qy + (r + quiet) * cell, cell, cell);
 
-  const font = (px: number, w = 400) => `${w} ${Math.round(px * u)}px system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif`;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  const tx = pad;
-  const maxW = qx - 2 * pad;
-  let y = qy + 18 * u;
-  ctx.fillStyle = '#111111';
-  ctx.font = font(17, 650);
-  ctx.fillText(`Student ID: ${st.id}`, tx, y, maxW);
-  y += 24 * u;
-  ctx.font = font(13);
+  // ID with the tree fingerprint under it, flush with the side of the image they sit on
+  const left = tb.corner.left;
+  const textX = left ? tb.x : tb.x + tb.w;
+  const textBottom = tb.y + tb.h - quiet * cell;
+  ctx.textAlign = left ? 'left' : 'right';
+  ctx.textBaseline = 'bottom';
   ctx.fillStyle = '#333333';
-  ctx.fillText(`Exported ${formatTime(st.t, st.z)}`, tx, y, maxW);
-  y += 20 * u;
-  ctx.fillText(`Tree ${fingerprint(st.s, st.b)}    Check code ${prettyCode(st.sig)}`, tx, y, maxW);
-  y += 26 * u;
-  ctx.font = font(11);
-  ctx.fillStyle = '#6b6b66';
-  ctx.fillText(`${CLASS_NAME}. Scan the QR code to verify this export.`, tx, y, maxW);
+  ctx.font = font(9.5);
+  ctx.fillText(hashText, textX, textBottom);
+  ctx.fillStyle = '#111111';
+  ctx.font = font(11.5, 650);
+  ctx.fillText(idText, textX, textBottom - Math.round(15 * u));
 
   return await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('PNG encoding failed'))), 'image/png'));
 }

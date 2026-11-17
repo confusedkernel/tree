@@ -84,7 +84,7 @@ export function ExportDialog() {
             />
           </label>
           {touched.value && !idOk && <p class="hint check-warn">Enter your student ID (letters and numbers, up to 40 characters).</p>}
-          <p class="hint">Your ID, the time and a QR code are printed under the tree, and your ID is repeated faintly behind it.</p>
+          <p class="hint">Your ID, a hash of the tree and a QR code are printed in corners of the image beside the tree, and your ID is repeated faintly across the image.</p>
           <div class="card">
             <h4>PNG</h4>
             <Seg label={t('scale')} small value={String(scale.value)} onChange={(v) => (scale.value = Number(v))} options={[2, 3, 4].map((x) => ({ v: String(x), label: `${x}× · ${Math.round(x * 96)} dpi` }))} />

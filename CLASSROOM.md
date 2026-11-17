@@ -6,9 +6,9 @@ A fork of [NanoTrees](https://github.com/interprole/tree) (MIT) for assignments 
 
 **Export (students).** The export dialog asks for a student ID and offers only a stamped PNG (download or copy). SVG, PDF and LaTeX export are removed, since they would give an unstamped picture. Each PNG has
 
-- the student ID repeated faintly behind the tree, so cropping off the footer does not remove it;
-- a footer with the ID, the export time, a tree fingerprint and a check code;
-- a QR code holding the tree as exported, the student ID, the time and a signature (HMAC-SHA256) over all of them.
+- the student ID repeated faintly across the whole image, so cropping does not remove it;
+- the ID and a tree fingerprint together in one corner (the export time and check code are in the QR code);
+- a QR code in another corner holding the tree as exported, the student ID, the time and a signature (HMAC-SHA256) over all of them.
 
 **X-bar mode (off by default).** X-bar mode fills in XP → X′ → X projections by itself, which gives the answer away on X-bar assignments, so this edition builds without it: the Labelling switch and the X-bar example are hidden, and saved files or shared links that ask for X-bar mode open in manual mode. To turn it back on, build with `VITE_CLASS_XBAR=on` (on GitHub, the repository variable `CLASS_XBAR`). The checker notes any export that was made in X-bar mode.
 
