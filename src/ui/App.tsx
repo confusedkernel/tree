@@ -11,7 +11,7 @@ import { t } from '../i18n';
 import {
   activateTree, activeId, addTree, arrowSource, build, error, linkedIds, mobileTab, modal, paneWidths, pick, relationOf, removeTree, renameTree, requestLabelFocus, scene, selection, shareUrl, showToast, sideTab, source, theme, toast, tool, tree, unlinkTree,
 } from '../state';
-import { Canvas, canvasApi } from './Canvas';
+import { addFirstNode, Canvas, canvasApi } from './Canvas';
 import { Seg, useDismiss } from './controls';
 import { Help, MyTrees, Shortcuts } from './Dialogs';
 import { Editor } from './Editor';
@@ -187,6 +187,10 @@ function useShortcuts() {
         return handled(), a && M.deleteArrow(a);
       }
       if (sel?.kind !== 'node') {
+        // an empty tree: Space, Enter or A gives it its first node (not while a button has the keyboard)
+        if ((key === ' ' || key === 'Enter' || key === 'a') && !scene.value && !(e.target as Element | null)?.closest?.('button, select, a, [role="menuitem"], [role="tab"]')) {
+          return handled(), addFirstNode(activeId.value);
+        }
         if (key.startsWith('Arrow')) return handled(), navigate('down');
         return;
       }

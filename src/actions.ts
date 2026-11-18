@@ -530,7 +530,8 @@ export function addRootNode(treeId: string) {
   queueMicrotask(() => {
     const src = source.value;
     const r = parse(src);
-    if (r.ok && r.doc.root) return;
+    // a tree with nodes, or code that does not parse (it is fixed in the code, not overwritten)
+    if (!r.ok || r.doc.root) return;
     const ins = src.trim() ? '[X]\n' : '[X]';
     applyEdit({ changes: [{ from: 0, to: src.trim() ? 0 : src.length, insert: ins }], select: { from: 1, to: 2 } });
     selectNewNode(1);

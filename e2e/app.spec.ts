@@ -53,6 +53,13 @@ async function showCode(page: Page) {
   await revealSheet(page);
 }
 async function selectTree(page: Page, index: number) {
+  // a click on an empty sheet would give it a node: open the code from a tree that has nodes
+  if (!await page.locator('.cm-content').isVisible() && await page.locator('.empty-sheet.active-sheet').count()) {
+    await page.getByRole('button', { name: 'Fit to window', exact: true }).click();
+    const other = page.locator('.other-sheet:not(.empty-sheet) .paper').first();
+    const box = (await other.boundingBox())!;
+    await other.click({ position: { x: box.width / 2, y: box.height - 5 } });
+  }
   await showCode(page);
   await page.locator('.tree-tab .tab-name').nth(index).click();
   await showCode(page);
@@ -752,8 +759,10 @@ test('one copy open although all copies are triangles; expression; code panel; c
   page.once('dialog', (d) => d.accept());
   await page.getByTestId('clear-canvas').click();
   await expect(page.locator('.tree-tab')).toHaveCount(1);
+  // a blank canvas: a click on its sheet gives the first node
+  await expect(page.locator('.empty-sheet.active-sheet')).toHaveCount(1);
   await showCode(page);
-  await expect(page.locator('.cm-placeholder')).toBeVisible();
+  await expect.poll(() => code(page)).toBe('[X]');
 });
 
 test('appearance for all trees: trees with their own value are asked about', async ({ page }) => {
@@ -808,6 +817,50 @@ test('empty trees: the sheet stays, a first node by right click, a branch dragge
   await page.locator('.ctx-menu button', { hasText: 'Add a node' }).click();
   await expect.poll(() => code(page)).toBe('[X]');
   await expect(page.locator('.inspector input[aria-label="Label"]')).toBeFocused();
+});
+
+test('an empty tree gets its first node by a click, or by Space', async ({ page }) => {
+  await page.goto('./');
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByTestId('examples-button').click();
+  await page.getByTestId('new-scratch').click();
+  await expect(page.locator('.empty-sheet.active-sheet')).toHaveCount(1);
+  // a blank canvas: one click on it adds the first node, ready to be named
+  await page.locator('.empty-sheet.active-sheet .paper').click();
+  await expect.poll(() => code(page)).toBe('[X]');
+  await expect(page.locator('.inspector input[aria-label="Label"]')).toBeFocused();
+  await page.keyboard.type('S');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => code(page)).toBe('[S]');
+  // a new, empty tree: Space adds its first node
+  await page.locator('.add-tree').click();
+  await expect(page.locator('.empty-sheet.active-sheet')).toHaveCount(1);
+  await page.locator('.canvas').focus();
+  await page.keyboard.press('Space');
+  await expect.poll(() => code(page)).toBe('[X]');
+  await expect(page.locator('.inspector input[aria-label="Label"]')).toBeFocused();
+  // Space with a tree that already has nodes does nothing of the kind
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Space');
+  await expect.poll(() => code(page)).toBe('[X]');
+});
+
+test('Space on a new tree centers its first node beside the panes that open', async ({ page }) => {
+  await page.goto('./');
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByTestId('examples-button').click();
+  await page.getByTestId('new-scratch').click();
+  await expect(page.locator('.empty-sheet.active-sheet')).toHaveCount(1);
+  await page.locator('.canvas').focus();
+  await page.keyboard.press('Space');
+  await expect.poll(() => code(page)).toBe('[X]');
+  // the code pane opened and narrowed the canvas: the node is in the middle of what is left, not under the pane
+  await expect.poll(async () => {
+    const canvas = (await page.getByTestId('canvas').boundingBox())!;
+    const node = (await page.locator('.active-sheet .node-hit').first().boundingBox())!;
+    return Math.abs(node.x + node.width / 2 - (canvas.x + canvas.width / 2));
+  }).toBeLessThan(40);
 });
 
 test('a selected copy stays selected while it is edited; a click on the canvas opens Customize', async ({ page }) => {

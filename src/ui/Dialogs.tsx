@@ -80,6 +80,7 @@ const KEYS: [string, string][] = [
   ['Ctrl/⌘ O', 'Open from disk'],
   ['Click', 'Select a node (also selects it in the code)'],
   ['Double-click, Enter, F2', 'Rename'],
+  ['Click, Space, Enter, A on an empty tree', 'Add its first node'],
   ['A', 'Add a daughter'],
   ['S', 'Add a sister'],
   ['P', 'Add a mother'],

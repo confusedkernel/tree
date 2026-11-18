@@ -151,20 +151,22 @@ export function Canvas() {
     view.value = { zoom, x: (w - (x2 - x1) * zoom) / 2 - x1 * zoom, y: Math.max(margin, (h - bottom + margin - (y2 - y1) * zoom) / 2) - y1 * zoom };
   };
 
+  /** the canvas bounds the view was last laid out for */
+  const bounds = useRef<DOMRect | null>(null);
   useEffect(() => {
     const el = wrap.current!;
-    let previousBounds: DOMRect | null = null;
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
+      const previousBounds = bounds.current;
       size.value = { w: r.width, h: r.height };
       if (!previousBounds) fit();
-      else {
+      else if (previousBounds.left !== r.left || previousBounds.top !== r.top) {
         const current = view.peek();
         // Panels change the canvas origin. Keep trees at the same screen
         // coordinates rather than recentering them in the remaining space.
         view.value = { ...current, x: current.x + previousBounds.left - r.left, y: current.y + previousBounds.top - r.top };
       }
-      previousBounds = r;
+      bounds.current = r;
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -188,6 +190,19 @@ export function Canvas() {
       setView({ zoom, x: (w - sheet.w * zoom) / 2 - entry.x * zoom, y: (h - 50 - sheet.h * zoom) / 2 - entry.y * zoom });
     });
   });
+  /** Center a tree in the visible canvas at the current zoom (smaller if it does not fit).
+   *  The canvas is measured now, so panels that just opened are taken into account. */
+  const centerTree = (id: string) => {
+    const entry = trees.value.find((t) => t.id === id);
+    if (!entry || !wrap.current) return;
+    const r = wrap.current.getBoundingClientRect();
+    bounds.current = r;
+    size.value = { w: r.width, h: r.height };
+    const sheet = sheetSize(entry.id);
+    const bottom = 64; // floating toolbar
+    const zoom = Math.max(0.15, Math.min(view.peek().zoom, (r.width - 64) / sheet.w, (r.height - bottom - 46) / sheet.h));
+    setView({ zoom, x: (r.width - sheet.w * zoom) / 2 - entry.x * zoom, y: (r.height - bottom - sheet.h * zoom) / 2 - entry.y * zoom });
+  };
   useSignalEffect(() => {
     void fontEpoch.value;
     requestAnimationFrame(() => !touched.current && fit());
@@ -458,6 +473,14 @@ export function Canvas() {
     if (d.moved) return;
     // a click (pointer capture retargets pointerup, so use the pointerdown target)
     const target = d.target ?? (e.target as Element);
+    // an empty tree: one click gives it its first node (on a canvas of one empty tree, a click anywhere)
+    if (tool.value === 'select') {
+      const emptyId = target.closest('[data-empty-tree]')?.getAttribute('data-empty-tree') ?? (trees.value.length === 1 && !scene.value && !target.closest('[data-tree-head]') ? activeId.value : null);
+      if (emptyId) {
+        addFirstNode(emptyId);
+        return;
+      }
+    }
     const other = target.closest('[data-tree]');
     if (other) {
       clickOtherTree(other.getAttribute('data-tree')!, e);
@@ -640,6 +663,7 @@ export function Canvas() {
     canvasApi.zoomIn = () => zoomBy(1.2);
     canvasApi.zoomOut = () => zoomBy(1 / 1.2);
     canvasApi.fit = () => fit();
+    canvasApi.centerTree = (id) => centerTree(id);
   });
 
   // ---------- render
@@ -855,12 +879,16 @@ function EmptySheet({ id, x, y, active }: { id: string; x: number; y: number; ac
   return (
     <g transform={`translate(${x} ${y})`} class={`sheet empty-sheet ${active ? 'active-sheet' : 'other-sheet'}`} data-tree={active ? undefined : id} data-empty-tree={id}>
       <rect class={`paper ${active && trees.value.length > 1 ? 'paper-active' : ''}`} width={EMPTY_SHEET.w} height={EMPTY_SHEET.h} fill="#ffffff" filter="url(#paper-shadow)" rx="2" />
-      <text x={EMPTY_SHEET.w / 2} y={EMPTY_SHEET.h / 2 - 6} class="empty-hint">
+      <text x={EMPTY_SHEET.w / 2} y={EMPTY_SHEET.h / 2 - 14} class="empty-hint">
         An empty tree
       </text>
-      <text x={EMPTY_SHEET.w / 2} y={EMPTY_SHEET.h / 2 + 12} class="empty-hint small">
-        right-click: add a node · or drop a branch here
+      <text x={EMPTY_SHEET.w / 2} y={EMPTY_SHEET.h / 2 + 6} class="empty-hint small">
+        {active ? 'Click or press Space: add a node' : 'Click: add a node'}
       </text>
+      <text x={EMPTY_SHEET.w / 2} y={EMPTY_SHEET.h / 2 + 22} class="empty-hint small">
+        or drop a branch here
+      </text>
+      <title>Click to add the first node</title>
     </g>
   );
 }
@@ -1010,6 +1038,15 @@ function ContextMenu({ at, close }: { at: CtxAt; close: () => void }) {
 }
 
 /** a tree without any node */
+/** An empty tree gets its first node, X, ready to be named (its code opens beside it). */
+export function addFirstNode(id: string) {
+  activateTree(id);
+  codeSelection.value = true;
+  A.addRootNode(id);
+  // the code and edit panes open and the canvas narrows: center the new node in what is left
+  requestAnimationFrame(() => requestAnimationFrame(() => canvasApi.centerTree?.(id)));
+}
+
 function isEmptyTree(id: string): boolean {
   return id === activeId.value ? !scene.value : !otherScenes.value.find((o) => o.entry.id === id)?.scene;
 }
@@ -1028,11 +1065,7 @@ function TreeItems({ id, run }: { id: string; run: (f: () => void) => () => void
   if (!entry) return null;
   return <>
     <p class="ctx-title">{entry.name}</p>
-    {isEmptyTree(id) && <button role="menuitem" onClick={run(() => {
-      activateTree(id);
-      codeSelection.value = true;
-      A.addRootNode(id);
-    })}><strong>Add a node</strong></button>}
+    {isEmptyTree(id) && <button role="menuitem" onClick={run(() => addFirstNode(id))}><strong>Add a node</strong></button>}
     {isEmptyTree(id) && A.clip.value && <button role="menuitem" onClick={run(() => A.pasteIntoTree(id))}><strong>Paste here</strong></button>}
     <button role="menuitem" onClick={run(() => { const name = prompt('Name of the tree', entry.name); if (name) renameTree(id, name); })}><strong>Rename the tree…</strong></button>
     <button role="menuitem" onClick={run(() => { activateTree(id); modal.value = 'export'; })}><strong>Export…</strong></button>
@@ -1050,7 +1083,7 @@ function TreeItems({ id, run }: { id: string; run: (f: () => void) => () => void
   </>;
 }
 
-export const canvasApi: { zoomIn?: () => void; zoomOut?: () => void; fit?: () => void } = {};
+export const canvasApi: { zoomIn?: () => void; zoomOut?: () => void; fit?: () => void; centerTree?: (id: string) => void } = {};
 
 function ToolBtn({ id, icon, label }: { id: Tool; icon: preact.JSX.Element; label: string }) {
   return (

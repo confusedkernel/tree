@@ -2438,6 +2438,10 @@ body.resizing .splitter::after {
   pointer-events: none;
 }
 
+.empty-sheet .paper {
+  cursor: pointer;
+}
+
 .empty-hint.small {
   font-weight: 400;
   font-size: 10.5px;
