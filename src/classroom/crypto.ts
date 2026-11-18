@@ -69,7 +69,7 @@ export function hmacSha256(key: string, msg: string): Uint8Array {
 export const sha256Hex = (s: string) => [...sha256(utf8(s))].map((b) => b.toString(16).padStart(2, '0')).join('');
 
 /** Crockford-like base32 without look-alike letters, so printed codes are easy to read. */
-const B32 = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+export const B32 = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export function base32(bytes: Uint8Array, n: number): string {
   let bits = 0, val = 0, out = '';
   for (const b of bytes) {

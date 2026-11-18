@@ -14,7 +14,7 @@ document.documentElement.lang = 'en';
 const checkLink = readCheckLink();
 const origin = initState();
 if (checkLink) openStamp(checkLink);
-// #check opens the grading log; a new #v=… link (pasted into the same tab) is checked at once
+// #check opens the grading log; a link from an older printout (#v=…) (pasted into the same tab) is checked at once
 const fromHash = () => {
   const st = readCheckLink();
   if (st) openStamp(st);

@@ -20,7 +20,7 @@ export function openStamp(st: Stamp) {
   checking.value = check(st);
 }
 
-/** Called before the app starts: a link from a QR code (#v=…) opens the checker. */
+/** Called before the app starts: a link from an older printout's QR code (#v=…) opens the checker. */
 export function readCheckLink(): Stamp | null {
   if (!/[#&]v=/.test(location.hash)) return null;
   return stampFromText(location.hash);
@@ -123,8 +123,8 @@ export function GradingLog() {
   return (
     <Modal title="Grading log" onClose={() => (logOpen.value = false)} wide>
       <p class="hint">
-        Scan a printed QR code with your phone camera, or add photos or scans of the printouts here. Every export you check is listed below; trees shared by
-        more than one student come first. The log stays on this device only.
+        Add photos or scans of the printouts (on a phone, you can take the photo right here), or paste the text of a QR code. Every export you check is
+        listed below; trees shared by more than one student come first. The log stays on this device only.
       </p>
       {USING_DEFAULT_SECRET && <p class="check-warn">This copy uses the default signing secret. Set VITE_CLASS_SECRET when you build it (see CLASSROOM.md).</p>}
       <div class="row wrap">
@@ -135,7 +135,7 @@ export function GradingLog() {
         <input
           class="check-paste"
           type="text"
-          placeholder="…or paste a link from a QR code"
+          placeholder="…or paste the text of a QR code"
           onKeyDown={(e) => e.key === 'Enter' && onPaste((e.currentTarget as HTMLInputElement).value)}
           onPaste={(e) => onPaste(e.clipboardData?.getData('text') ?? '')}
         />

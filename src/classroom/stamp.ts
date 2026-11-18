@@ -1,11 +1,13 @@
-import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
+import { decompressFromEncodedURIComponent } from 'lz-string';
+import { deflateRaw, inflateRaw } from 'pako';
 import qrcode from 'qrcode-generator';
 import { parse } from '../core/parser';
 import { buildTree, defaultBuildOptions } from '../core/build';
 import type { BuildOptions } from '../core/build';
 import { serialize } from '../core/serialize';
 import { CLASS_SECRET } from './config';
-import { base32, hmacSha256, sha256Hex } from './crypto';
+import { B32 as SIG_ALPHABET, base32, hmacSha256, sha256Hex } from './crypto';
+import { QR_DICTIONARY_1 } from './qrDictionary';
 
 /** What the QR code carries: who exported which tree, when, and a signature over all of it. */
 export interface Stamp {
@@ -64,32 +66,142 @@ export function fingerprint(s: string, b?: unknown): string {
 
 /* ------------------------------------------------------------ QR payload */
 
+/*
+ * Payload layout (format 1), as bytes:
+ *   [0]      format number in the low 4 bits; bit 4 set when there are build options, bit 5 for style
+ *   [1..7]   the 10-character check code, 5 bits per character
+ *   varint   export time, minutes since 2024-01-01 UTC (zigzag)
+ *   varint   time zone offset in quarter hours (zigzag)
+ *   rest     deflate (with a preset dictionary of common tree text) of
+ *            "<student ID>\0<tree code>[\0<build options JSON>][\0<style JSON>]"
+ * The bytes are written in base32 (A–Z, 2–7), which fits the QR code's alphanumeric mode
+ * (5.5 bits a character instead of 8). Together this needs far fewer modules than the JSON
+ * that older codes carried (links with #v=…, or NTV1:…), which are still read.
+ */
+const FORMAT = 1;
+const EPOCH = Date.UTC(2024, 0, 1) / 60000;
+const DICT = new TextEncoder().encode(QR_DICTIONARY_1);
+const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+function toBase32(bytes: Uint8Array): string {
+  let out = '';
+  let v = 0;
+  let n = 0;
+  for (const x of bytes) {
+    v = ((v << 8) | x) & 0xffff;
+    n += 8;
+    while (n >= 5) out += B32[(v >>> (n -= 5)) & 31];
+  }
+  if (n) out += B32[(v << (5 - n)) & 31];
+  return out;
+}
+
+function fromBase32(text: string): Uint8Array | null {
+  const out: number[] = [];
+  let v = 0;
+  let n = 0;
+  for (const ch of text) {
+    const d = B32.indexOf(ch);
+    if (d < 0) return null;
+    v = ((v << 5) | d) & 0xffff;
+    n += 5;
+    if (n >= 8) out.push((v >>> (n -= 8)) & 255);
+  }
+  return Uint8Array.from(out);
+}
+
+const zigzag = (n: number) => (n < 0 ? -2 * n - 1 : 2 * n);
+const unzigzag = (n: number) => (n % 2 ? -(n + 1) / 2 : n / 2);
+
+function putVarint(out: number[], n: number) {
+  for (; n >= 128; n = Math.floor(n / 128)) out.push((n % 128) | 128);
+  out.push(n);
+}
+
+const isStamp = (st: Stamp | null): st is Stamp => !!st && st.v === 1 && typeof st.id === 'string' && typeof st.s === 'string' && typeof st.sig === 'string';
+
 export function encodePayload(st: Stamp): string {
-  return compressToEncodedURIComponent(JSON.stringify(st));
+  const hasB = st.b != null;
+  const hasSt = st.st != null;
+  const out = [FORMAT | (hasB ? 16 : 0) | (hasSt ? 32 : 0)];
+  // check code: 10 characters of 5 bits, in 7 bytes
+  let bits = 0n;
+  for (const ch of st.sig) {
+    const d = SIG_ALPHABET.indexOf(ch);
+    if (d < 0 || st.sig.length !== 10) throw new Error('Bad check code');
+    bits = (bits << 5n) | BigInt(d);
+  }
+  for (let i = 6; i >= 0; i--) out.push(Number((bits >> BigInt(8 * i)) & 255n));
+  putVarint(out, zigzag(st.t - EPOCH));
+  putVarint(out, zigzag(Math.round(st.z / 15)));
+  const parts = [st.id, st.s];
+  if (hasB) parts.push(JSON.stringify(st.b));
+  if (hasSt) parts.push(JSON.stringify(st.st));
+  const body = deflateRaw(new TextEncoder().encode(parts.join('\0')), { level: 9, dictionary: DICT });
+  return toBase32(Uint8Array.from([...out, ...body]));
 }
 
 export function decodePayload(p: string): Stamp | null {
   try {
-    const json = decompressFromEncodedURIComponent(p);
-    if (!json) return null;
-    const st = JSON.parse(json) as Stamp;
-    return st && st.v === 1 && typeof st.id === 'string' && typeof st.s === 'string' && typeof st.sig === 'string' ? st : null;
+    const bytes = fromBase32(p);
+    if (!bytes || bytes.length < 10 || (bytes[0] & 15) !== FORMAT) return null;
+    const hasB = !!(bytes[0] & 16);
+    const hasSt = !!(bytes[0] & 32);
+    let bits = 0n;
+    for (let i = 1; i <= 7; i++) bits = (bits << 8n) | BigInt(bytes[i]);
+    let sig = '';
+    for (let i = 9; i >= 0; i--) sig += SIG_ALPHABET[Number((bits >> BigInt(5 * i)) & 31n)] ?? '?';
+    let pos = 8;
+    const varint = () => {
+      let n = 0;
+      for (let k = 1; ; k *= 128) {
+        if (pos >= bytes.length) throw new Error('truncated');
+        const b = bytes[pos++];
+        n += (b & 127) * k;
+        if (b < 128) return n;
+      }
+    };
+    const t = unzigzag(varint()) + EPOCH;
+    const z = unzigzag(varint()) * 15;
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(inflateRaw(bytes.subarray(pos), { dictionary: DICT }));
+    const parts = text.split('\0');
+    const sty = hasSt ? JSON.parse(parts.pop()!) : undefined;
+    const b = hasB ? JSON.parse(parts.pop()!) : undefined;
+    if (parts.length < 2) return null;
+    const st: Stamp = { v: 1, id: parts[0], t, z, s: parts.slice(1).join('\0'), sig };
+    if (hasB) st.b = b;
+    if (hasSt) st.st = sty;
+    return isStamp(st) ? st : null;
   } catch {
     return null;
   }
 }
 
-/** The text in the QR code: a link back to this page when it is online, so a phone camera opens the checker. */
-export function qrText(st: Stamp): string {
-  const p = encodePayload(st);
-  if (/^https?:$/.test(location.protocol)) return `${location.origin}${location.pathname}#v=${p}`;
-  return `NTV1:${p}`;
+/** Codes printed before the alphanumeric payload. */
+function decodeLegacyPayload(p: string): Stamp | null {
+  try {
+    const json = decompressFromEncodedURIComponent(p);
+    if (!json) return null;
+    const st = JSON.parse(json) as Stamp;
+    return isStamp(st) ? st : null;
+  } catch {
+    return null;
+  }
 }
 
-/** Reads a stamp from scanned QR text or a pasted link. */
+/**
+ * The text in the QR code: "NTV2:" and the payload. Every character fits the QR code's
+ * alphanumeric mode. There is no link back to the site (a URL would take about a quarter of the
+ * code), so codes are read in the grading log (#check) from a photo, a scan or pasted text.
+ */
+export const qrText = (st: Stamp) => `NTV2:${encodePayload(st)}`;
+
+/** Reads a stamp from scanned QR text, or from a link in an older printout's code. */
 export function stampFromText(text: string): Stamp | null {
-  const m = /#v=([A-Za-z0-9+\-$]+)/.exec(text) ?? /NTV1:([A-Za-z0-9+\-$]+)/.exec(text);
-  return m ? decodePayload(m[1]) : null;
+  const m = /NTV2:([A-Z2-7]+)/.exec(text);
+  if (m) return decodePayload(m[1]);
+  const old = /#v=([A-Za-z0-9+\-$]+)/.exec(text) ?? /NTV1:([A-Za-z0-9+\-$]+)/.exec(text);
+  return old ? decodeLegacyPayload(old[1]) : null;
 }
 
 /* ------------------------------------------------------------ dates */
@@ -147,11 +259,13 @@ export async function stampPng(treePng: Blob, scale: number, st: Stamp): Promise
   const th = y1 - y0 + 1;
 
   const qr = qrcode(0, 'M');
-  qr.addData(qrText(st), 'Byte');
+  qr.addData(qrText(st), 'Alphanumeric');
   qr.make();
   const n = qr.getModuleCount();
   const quiet = 2; // modules of white around the code, kept clear of the watermark
-  const cell = Math.max(2, Math.round((76 * u) / (n + 2 * quiet)));
+  // a fixed module size rather than a fixed code size: modules stay the same size whatever the tree,
+  // and the code just grows a little with longer trees. Whole pixels keep the edges crisp in print.
+  const cell = Math.max(2, Math.round(1.25 * u));
   const qrSize = cell * (n + 2 * quiet);
 
   const font = (px: number, w = 400) => `${w} ${Math.round(px * u)}px system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif`;
